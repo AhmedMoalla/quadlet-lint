@@ -3,12 +3,44 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/containers/podman/v5/pkg/systemd/parser"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	"github.com/containers/podman/v5/pkg/systemd/parser"
 )
+
+func main() {
+	inputPath := readInputPath()
+	unitFilesPaths := findUnitFiles(inputPath)
+	if len(unitFilesPaths) == 0 {
+		fmt.Printf("no unit files were found in %s\n", inputPath)
+		os.Exit(0)
+	}
+
+	unitFiles, parsingErrors := parseUnitFiles(unitFilesPaths)
+
+	validationErrors := validateUnitFiles(unitFiles)
+
+	errors := validationErrors.Merge(parsingErrors)
+	reportErrors(errors)
+
+	logSummary(unitFiles, errors)
+}
+
+func logSummary(unitFiles []parser.UnitFile, errors validator.ValidationErrors) {
+	var status string
+	if errors.HasErrors() {
+		status = "Failed"
+	} else {
+		status = "Passed"
+	}
+
+	fmt.Printf("%s: %d failure(s), %d warning(s) on %d files.\n",
+		status, len(errors.Level(validator.Error)), len(errors.Level(validator.Warning)), len(unitFiles))
+}
 
 func readInputPath() string {
 	flag.Parse()
@@ -32,33 +64,54 @@ func findUnitFiles(inputDirOrFile string) []string {
 	return unitFilesPaths
 }
 
-func parseUnitFiles(unitFilesPaths []string) []parser.UnitFile {
-	unitFiles := make([]parser.UnitFile, len(unitFilesPaths))
+func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.ValidationErrors) {
+	errors := make(validator.ValidationErrors)
+	unitFiles := make([]parser.UnitFile, 0, len(unitFilesPaths))
 	for _, path := range unitFilesPaths {
 		unitFile, err := parser.ParseUnitFile(path)
 		if err != nil {
-			reportError(path, err)
+			errors.AddError(path, validator.ValidationError{
+				FilePath:  path,
+				Level:     validator.Error,
+				Message:   err.Error(),
+				ErrorType: validator.ParsingError,
+			})
+		} else if unitFile != nil {
+			unitFiles = append(unitFiles, *unitFile)
 		}
-		unitFiles = append(unitFiles, *unitFile)
 	}
-	return unitFiles
+	return unitFiles, errors
 }
 
-func main() {
-	inputPath := readInputPath()
-	unitFilesPaths := findUnitFiles(inputPath)
-	if len(unitFilesPaths) == 0 {
-		fmt.Printf("no unit files were found in %s\n", inputPath)
-		os.Exit(0)
+func validateUnitFiles(unitFiles []parser.UnitFile) validator.ValidationErrors {
+	validationErrors := make(validator.ValidationErrors)
+	validators := []validator.Validator{
+		validator.QuadletValidator{},
 	}
-
-	unitFiles := parseUnitFiles(unitFilesPaths)
 
 	for _, file := range unitFiles {
-		fmt.Println(file.Filename)
+		for _, vtor := range validators {
+			validationErrors.AddError(file.Filename, vtor.Validate(file)...)
+		}
 	}
+	return validationErrors
+}
 
-	reportErrors()
+func reportErrors(errors validator.ValidationErrors) {
+	if errors.HasErrors() {
+		fmt.Println("Following errors have been found")
+		for path, errs := range errors {
+			if len(errs) == 0 {
+				continue
+			}
+
+			fmt.Printf("%s:\n", path)
+			for _, err := range errs {
+				fmt.Printf("\t-> [%s][%d:%d][%s] %s\n", err.Level, err.Position.Line, err.Position.Column,
+					err.ErrorType, err.Message)
+			}
+		}
+	}
 }
 
 func getWorkingDirectory() string {
@@ -102,25 +155,4 @@ func getAllUnitFiles(rootDirectory string) []string {
 	}
 
 	return unitFilesPaths
-}
-
-var errors = make(map[string][]error)
-
-func reportError(path string, err error) {
-	if _, present := errors[path]; !present {
-		errors[path] = make([]error, 0, 1)
-	}
-	errors[path] = append(errors[path], err)
-}
-
-func reportErrors() {
-	if len(errors) > 0 {
-		fmt.Println("Following errors have been found")
-		for path, errs := range errors {
-			fmt.Printf("%s:\n", path)
-			for _, err := range errs {
-				fmt.Printf("\t-> %s\n", err)
-			}
-		}
-	}
 }
