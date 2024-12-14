@@ -2,37 +2,23 @@ package parser
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"os/user"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
 )
 
-// This code (UnitFile) support reading well formed files in the same
-// format as the systmed unit files. It can also regenerate the file
-// essentially identically, including comments and group/key order.
-// The only thing that is modified is that multiple instances of one
-// group are merged.
-
-// There is also support for reading and modifying keys while the
-// UnitFile is in memory, including support for systemd-like slitting
-// of argument lines and escaping/unescaping of text.
-
 type unitLine struct {
-	key       string
-	value     string
-	isComment bool
+	key   string
+	value string
 }
 
 type unitGroup struct {
-	name     string
-	comments []*unitLine // Comments before the groupname
-	lines    []*unitLine
+	name  string
+	lines []*unitLine
 }
 
 type UnitFile struct {
@@ -46,31 +32,47 @@ type UnitFile struct {
 type UnitFileParser struct {
 	file *UnitFile
 
-	currentGroup    *unitGroup
-	pendingComments []*unitLine
-	lineNr          int
+	currentGroup *unitGroup
+	lineNr       int
 }
 
-func newUnitLine(key string, value string, isComment bool) *unitLine {
+type ParsingError struct {
+	inner   error
+	message string
+	Line    int
+	Column  int
+}
+
+func newParsingError(line int, column int, message string) *ParsingError {
+	return &ParsingError{
+		message: message,
+		Line:    line,
+		Column:  column,
+	}
+}
+
+func newParsingErrorAtLine(line int, message string) *ParsingError {
+	return newParsingError(line, 0, message)
+}
+
+func (e *ParsingError) Error() string {
+	if e.inner != nil {
+		return fmt.Sprintf("%s", e.inner.Error())
+	}
+
+	return fmt.Sprintf("%s", e.message)
+}
+
+func newUnitLine(key string, value string) *unitLine {
 	l := &unitLine{
-		key:       key,
-		value:     value,
-		isComment: isComment,
+		key:   key,
+		value: value,
 	}
 	return l
 }
 
-func (l *unitLine) set(value string) {
-	l.value = value
-}
-
-func (l *unitLine) dup() *unitLine {
-	return newUnitLine(l.key, l.value, l.isComment)
-}
-
 func (l *unitLine) isKey(key string) bool {
-	return !l.isComment &&
-		l.key == key
+	return l.key == key
 }
 
 func (l *unitLine) isEmpty() bool {
@@ -79,9 +81,8 @@ func (l *unitLine) isEmpty() bool {
 
 func newUnitGroup(name string) *unitGroup {
 	g := &unitGroup{
-		name:     name,
-		comments: make([]*unitLine, 0),
-		lines:    make([]*unitLine, 0),
+		name:  name,
+		lines: make([]*unitLine, 0),
 	}
 	return g
 }
@@ -95,17 +96,8 @@ func (g *unitGroup) prependLine(line *unitLine) {
 	g.lines = append(n, g.lines...)
 }
 
-func (g *unitGroup) addComment(line *unitLine) {
-	g.comments = append(g.comments, line)
-}
-
-func (g *unitGroup) prependComment(line *unitLine) {
-	n := []*unitLine{line}
-	g.comments = append(n, g.comments...)
-}
-
 func (g *unitGroup) add(key string, value string) {
-	g.addLine(newUnitLine(key, value, false))
+	g.addLine(newUnitLine(key, value))
 }
 
 func (g *unitGroup) findLast(key string) *unitLine {
@@ -119,35 +111,6 @@ func (g *unitGroup) findLast(key string) *unitLine {
 	return nil
 }
 
-func (g *unitGroup) set(key string, value string) {
-	line := g.findLast(key)
-	if line != nil {
-		line.set(value)
-	} else {
-		g.add(key, value)
-	}
-}
-
-func (g *unitGroup) unset(key string) {
-	newlines := make([]*unitLine, 0, len(g.lines))
-
-	for _, line := range g.lines {
-		if !line.isKey(key) {
-			newlines = append(newlines, line)
-		}
-	}
-	g.lines = newlines
-}
-
-func (g *unitGroup) merge(source *unitGroup) {
-	for _, l := range source.comments {
-		g.comments = append(g.comments, l.dup())
-	}
-	for _, l := range source.lines {
-		g.lines = append(g.lines, l.dup())
-	}
-}
-
 // Create an empty unit file, with no filename or path
 func NewUnitFile() *UnitFile {
 	f := &UnitFile{
@@ -159,10 +122,10 @@ func NewUnitFile() *UnitFile {
 }
 
 // Load a unit file from disk, remembering the path and filename
-func ParseUnitFile(pathName string) (*UnitFile, error) {
+func ParseUnitFile(pathName string) (*UnitFile, *ParsingError) {
 	data, e := os.ReadFile(pathName)
 	if e != nil {
-		return nil, e
+		return nil, &ParsingError{inner: e}
 	}
 
 	f := NewUnitFile()
@@ -186,22 +149,6 @@ func (f *UnitFile) ensureGroup(groupName string) *unitGroup {
 	f.groupByName[groupName] = g
 
 	return g
-}
-
-func (f *UnitFile) Merge(source *UnitFile) {
-	for _, srcGroup := range source.groups {
-		group := f.ensureGroup(srcGroup.name)
-		group.merge(srcGroup)
-	}
-}
-
-// Create a copy of the unit file, copies filename but not path
-func (f *UnitFile) Dup() *UnitFile {
-	copy := NewUnitFile()
-
-	copy.Merge(f)
-	copy.Filename = f.Filename
-	return copy
 }
 
 func lineIsComment(line string) bool {
@@ -250,74 +197,60 @@ func lineIsKeyValuePair(line string) bool {
 	return true
 }
 
-func groupNameIsValid(name string) bool {
+func groupNameIsValid(name string) (valid bool, badCharacterIndex int) {
 	if len(name) == 0 {
-		return false
+		return false, 0
 	}
 
-	for _, c := range name {
+	for index, c := range name {
 		if c == ']' || c == '[' || unicode.IsControl(c) {
-			return false
+			return false, index
 		}
 	}
 
-	return true
+	return true, -1
 }
 
-func keyNameIsValid(name string) bool {
+func keyNameIsValid(name string) (valid bool, badCharacterIndex int) {
 	if len(name) == 0 {
-		return false
+		return false, 0
 	}
 
-	for _, c := range name {
+	for index, c := range name {
 		if c == '=' {
-			return false
+			return false, index
 		}
 	}
 
 	// No leading/trailing space
-	if name[0] == ' ' || name[len(name)-1] == ' ' {
-		return false
+	if name[0] == ' ' {
+		return false, 0
 	}
 
-	return true
+	if name[len(name)-1] == ' ' {
+		return false, len(name) - 1
+	}
+
+	return true, -1
 }
 
-func (p *UnitFileParser) parseComment(line string) error {
-	l := newUnitLine("", line, true)
-	p.pendingComments = append(p.pendingComments, l)
-	return nil
-}
-
-func (p *UnitFileParser) parseGroup(line string) error {
+func (p *UnitFileParser) parseGroup(line string) *ParsingError {
 	end := strings.Index(line, "]")
 
 	groupName := line[1:end]
 
-	if !groupNameIsValid(groupName) {
-		return fmt.Errorf("invalid group name: %s", groupName)
+	if valid, badIndex := groupNameIsValid(groupName); !valid {
+		return newParsingError(p.lineNr, badIndex+1, fmt.Sprintf("invalid group name: %s", groupName))
 	}
 
 	p.currentGroup = p.file.ensureGroup(groupName)
 
-	if p.pendingComments != nil {
-		firstComment := p.pendingComments[0]
-
-		// Remove one newline between groups, which is re-added on
-		// printing, see unitGroup.Write()
-		if firstComment.isEmpty() {
-			p.pendingComments = p.pendingComments[1:]
-		}
-
-		p.flushPendingComments(true)
-	}
-
 	return nil
 }
 
-func (p *UnitFileParser) parseKeyValuePair(line string) error {
+func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	if p.currentGroup == nil {
-		return fmt.Errorf("key file does not start with a group")
+		return newParsingErrorAtLine(p.lineNr, "key file does not start with a group")
 	}
 
 	keyEnd := strings.Index(line, "=")
@@ -328,8 +261,8 @@ func (p *UnitFileParser) parseKeyValuePair(line string) error {
 		keyEnd--
 	}
 	key := line[:keyEnd]
-	if !keyNameIsValid(key) {
-		return fmt.Errorf("invalid key name: %s", key)
+	if valid, badIndex := keyNameIsValid(key); !valid {
+		return newParsingError(p.lineNr, badIndex, fmt.Sprintf("invalid key name: %s", key))
 	}
 
 	// Pull the value from the line (chugging leading whitespace)
@@ -340,39 +273,19 @@ func (p *UnitFileParser) parseKeyValuePair(line string) error {
 
 	value := line[valueStart:]
 
-	p.flushPendingComments(false)
-
 	p.currentGroup.add(key, value)
 
 	return nil
 }
 
-func (p *UnitFileParser) parseLine(line string) error {
+func (p *UnitFileParser) parseLine(line string) *ParsingError {
 	switch {
-	case lineIsComment(line):
-		return p.parseComment(line)
 	case lineIsGroup(line):
 		return p.parseGroup(line)
 	case lineIsKeyValuePair(line):
 		return p.parseKeyValuePair(line)
 	default:
-		return fmt.Errorf("file contains line %d: “%s” which is not a key-value pair, group, or comment", p.lineNr, line)
-	}
-}
-
-func (p *UnitFileParser) flushPendingComments(toComment bool) {
-	pending := p.pendingComments
-	if pending == nil {
-		return
-	}
-	p.pendingComments = nil
-
-	for _, pendingLine := range pending {
-		if toComment {
-			p.currentGroup.addComment(pendingLine)
-		} else {
-			p.currentGroup.addLine(pendingLine)
-		}
+		return newParsingErrorAtLine(p.lineNr, fmt.Sprintf("“%s” is not a key-value pair or group", line))
 	}
 }
 
@@ -393,7 +306,7 @@ func trimSpacesFromLines(data string) string {
 }
 
 // Parse an already loaded unit file (in the form of a string)
-func (f *UnitFile) Parse(data string) error {
+func (f *UnitFile) Parse(data string) *ParsingError {
 	p := &UnitFileParser{
 		file:   f,
 		lineNr: 1,
@@ -418,6 +331,10 @@ func (f *UnitFile) Parse(data string) error {
 			}
 		}
 
+		if lineIsComment(line) {
+			continue
+		}
+
 		if err := p.parseLine(line); err != nil {
 			return err
 		}
@@ -429,77 +346,8 @@ func (f *UnitFile) Parse(data string) error {
 		// For files without groups, add an empty group name used only for initial comments
 		p.currentGroup = p.file.ensureGroup("")
 	}
-	p.flushPendingComments(false)
 
 	return nil
-}
-
-func (l *unitLine) write(w io.Writer) error {
-	if l.isComment {
-		if _, err := fmt.Fprintf(w, "%s\n", l.value); err != nil {
-			return err
-		}
-	} else {
-		if _, err := fmt.Fprintf(w, "%s=%s\n", l.key, l.value); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (g *unitGroup) write(w io.Writer) error {
-	for _, c := range g.comments {
-		if err := c.write(w); err != nil {
-			return err
-		}
-	}
-
-	if g.name == "" {
-		// Empty name groups are not valid, but used internally to handle comments in empty files
-		return nil
-	}
-
-	if _, err := fmt.Fprintf(w, "[%s]\n", g.name); err != nil {
-		return err
-	}
-
-	for _, l := range g.lines {
-		if err := l.write(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Convert a UnitFile back to data, writing to the io.Writer w
-func (f *UnitFile) Write(w io.Writer) error {
-	for i, g := range f.groups {
-		// We always add a newline between groups, and strip one if it exists during
-		// parsing. This looks nicer, and avoids issues of duplicate newlines when
-		// merging groups or missing ones when creating new groups
-		if i != 0 {
-			if _, err := io.WriteString(w, "\n"); err != nil {
-				return err
-			}
-		}
-
-		if err := g.write(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Convert a UnitFile back to data, as a string
-func (f *UnitFile) ToString() (string, error) {
-	var str strings.Builder
-	if err := f.Write(&str); err != nil {
-		return "", err
-	}
-	return str.String(), nil
 }
 
 func applyLineContinuation(raw string) string {
@@ -527,40 +375,6 @@ func (f *UnitFile) HasGroup(groupName string) bool {
 	return ok
 }
 
-func (f *UnitFile) RemoveGroup(groupName string) {
-	g, ok := f.groupByName[groupName]
-	if ok {
-		delete(f.groupByName, groupName)
-
-		newgroups := make([]*unitGroup, 0, len(f.groups))
-		for _, oldgroup := range f.groups {
-			if oldgroup != g {
-				newgroups = append(newgroups, oldgroup)
-			}
-		}
-		f.groups = newgroups
-	}
-}
-
-func (f *UnitFile) RenameGroup(groupName string, newName string) {
-	group, okOld := f.groupByName[groupName]
-	if !okOld {
-		return
-	}
-
-	newGroup, okNew := f.groupByName[newName]
-	if !okNew {
-		// New group doesn't exist, just rename in-place
-		delete(f.groupByName, groupName)
-		group.name = newName
-		f.groupByName[newName] = group
-	} else if group != newGroup {
-		/* merge to existing group and delete old */
-		newGroup.merge(group)
-		f.RemoveGroup(groupName)
-	}
-}
-
 func (f *UnitFile) ListGroups() []string {
 	groups := make([]string, len(f.groups))
 	for i, group := range f.groups {
@@ -578,11 +392,9 @@ func (f *UnitFile) ListKeys(groupName string) []string {
 	hash := make(map[string]struct{})
 	keys := make([]string, 0, len(g.lines))
 	for _, line := range g.lines {
-		if !line.isComment {
-			if _, ok := hash[line.key]; !ok {
-				keys = append(keys, line.key)
-				hash[line.key] = struct{}{}
-			}
+		if _, ok := hash[line.key]; !ok {
+			keys = append(keys, line.key)
+			hash[line.key] = struct{}{}
 		}
 	}
 
@@ -869,137 +681,4 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 		}
 	}
 	return res
-}
-
-func (f *UnitFile) Set(groupName string, key string, value string) {
-	group := f.ensureGroup(groupName)
-	group.set(key, value)
-}
-
-func (f *UnitFile) Setv(groupName string, keyvals ...string) {
-	group := f.ensureGroup(groupName)
-	for i := 0; i+1 < len(keyvals); i += 2 {
-		group.set(keyvals[i], keyvals[i+1])
-	}
-}
-
-func (f *UnitFile) Add(groupName string, key string, value string) {
-	group := f.ensureGroup(groupName)
-	group.add(key, value)
-}
-
-func (f *UnitFile) AddCmdline(groupName string, key string, args []string) {
-	f.Add(groupName, key, escapeWords(args))
-}
-
-func (f *UnitFile) Unset(groupName string, key string) {
-	group, ok := f.groupByName[groupName]
-	if ok {
-		group.unset(key)
-	}
-}
-
-// Empty group name == first group
-func (f *UnitFile) AddComment(groupName string, comments ...string) {
-	var group *unitGroup
-	if groupName == "" && len(f.groups) > 0 {
-		group = f.groups[0]
-	} else {
-		// Uses magic "" for first comment-only group if no other groups
-		group = f.ensureGroup(groupName)
-	}
-
-	for _, comment := range comments {
-		group.addComment(newUnitLine("", "# "+comment, true))
-	}
-}
-
-func (f *UnitFile) PrependComment(groupName string, comments ...string) {
-	var group *unitGroup
-	if groupName == "" && len(f.groups) > 0 {
-		group = f.groups[0]
-	} else {
-		// Uses magic "" for first comment-only group if no other groups
-		group = f.ensureGroup(groupName)
-	}
-	// Prepend in reverse order to keep argument order
-	for i := len(comments) - 1; i >= 0; i-- {
-		group.prependComment(newUnitLine("", "# "+comments[i], true))
-	}
-}
-
-func (f *UnitFile) PrependUnitLine(groupName string, key string, value string) {
-	var group *unitGroup
-	if groupName == "" && len(f.groups) > 0 {
-		group = f.groups[0]
-	} else {
-		// Uses magic "" for first comment-only group if no other groups
-		group = f.ensureGroup(groupName)
-	}
-	group.prependLine(newUnitLine(key, value, false))
-}
-
-func (f *UnitFile) GetTemplateParts() (string, string, bool) {
-	ext := filepath.Ext(f.Filename)
-	basename := strings.TrimSuffix(f.Filename, ext)
-	parts := strings.SplitN(basename, "@", 2)
-	if len(parts) < 2 {
-		return parts[0], "", false
-	}
-	return parts[0], parts[1], true
-}
-
-func (f *UnitFile) GetUnitDropinPaths() []string {
-	unitName, instanceName, isTemplate := f.GetTemplateParts()
-
-	ext := filepath.Ext(f.Filename)
-	dropinExt := ext + ".d"
-
-	dropinPaths := []string{}
-
-	// Add top-level drop-in location (pod.d, container.d, etc)
-	topLevelDropIn := strings.TrimPrefix(dropinExt, ".")
-	dropinPaths = append(dropinPaths, topLevelDropIn)
-
-	truncatedParts := strings.Split(unitName, "-")
-	// If the unit contains any '-', then there are truncated paths to search.
-	if len(truncatedParts) > 1 {
-		// We don't need the last item because that would be the full path
-		truncatedParts = truncatedParts[:len(truncatedParts)-1]
-		// Truncated instance names are not included in the drop-in search path
-		// i.e. template-unit@base-instance.service does not search template-unit@base-.service
-		// So we only search truncations of the template name, i.e. template-@.service, and unit name, i.e. template-.service
-		// or only the unit name if it is not a template.
-		for i := range truncatedParts {
-			truncatedUnitPath := strings.Join(truncatedParts[:i+1], "-") + "-"
-			dropinPaths = append(dropinPaths, truncatedUnitPath+dropinExt)
-			// If the unit is a template, add the truncated template name as well.
-			if isTemplate {
-				truncatedTemplatePath := truncatedUnitPath + "@"
-				dropinPaths = append(dropinPaths, truncatedTemplatePath+dropinExt)
-			}
-		}
-	}
-	// For instanced templates, add the base template unit search path
-	if instanceName != "" {
-		dropinPaths = append(dropinPaths, unitName+"@"+dropinExt)
-	}
-	// Add the drop-in directory for the full filename
-	dropinPaths = append(dropinPaths, f.Filename+".d")
-	// Finally, reverse the list so that when drop-ins are parsed,
-	// the most specific are applied instead of the most broad.
-	// dropinPaths should be a list where the items are in order of specific -> broad
-	// i.e., the most specific search path is dropinPaths[0], and broadest search path is dropinPaths[len(dropinPaths)-1]
-	// Uses https://go.dev/wiki/SliceTricks#reversing
-	for i := len(dropinPaths)/2 - 1; i >= 0; i-- {
-		opp := len(dropinPaths) - 1 - i
-		dropinPaths[i], dropinPaths[opp] = dropinPaths[opp], dropinPaths[i]
-	}
-	return dropinPaths
-}
-
-func PathEscape(path string) string {
-	var escaped strings.Builder
-	escapeString(&escaped, path, true)
-	return escaped.String()
 }

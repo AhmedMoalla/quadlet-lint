@@ -75,6 +75,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 				Level:     validator.Error,
 				Message:   err.Error(),
 				ErrorType: validator.ParsingError,
+				Position:  validator.Position{Line: err.Line, Column: err.Column},
 			})
 		} else if unitFile != nil {
 			unitFiles = append(unitFiles, *unitFile)

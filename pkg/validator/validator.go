@@ -8,34 +8,34 @@ type Validator interface {
 
 type ValidationError struct {
 	FilePath      string
-	Position      ValidationErrorPosition
-	Level         ValidationErrorLevel
-	ErrorType     ValidationErrorType
+	Position      Position
+	Level         Level
+	ErrorType     ErrorType
 	ValidatorName string
 	Message       string
 }
 
-type ValidationErrorPosition struct {
+type Position struct {
 	Line   int
 	Column int
 }
 
-type ValidationErrorLevel string
+type Level string
 
 const (
-	Error   ValidationErrorLevel = "error"
-	Warning ValidationErrorLevel = "warning"
+	Error   Level = "error"
+	Warning Level = "warning"
 )
 
-type ValidationErrorType string
+type ErrorType string
 
 const (
-	ParsingError ValidationErrorType = "parsing-error"
+	ParsingError ErrorType = "parsing-error"
 )
 
 type ValidationErrors map[string][]ValidationError
 
-func (errors ValidationErrors) Level(level ValidationErrorLevel) []ValidationError {
+func (errors ValidationErrors) Level(level Level) []ValidationError {
 	levelErrors := make([]ValidationError, 0)
 
 	for _, errs := range errors {

@@ -497,19 +497,3 @@ func escapeString(escaped *strings.Builder, word string, isPath bool) {
 		}
 	}
 }
-
-func escapeWords(words []string) string {
-	var escaped strings.Builder
-
-	for i, word := range words {
-		if i != 0 {
-			escaped.WriteString(" ")
-		}
-		if wordNeedEscape(word) {
-			appendEscapeWord(&escaped, word)
-		} else {
-			escaped.WriteString(word)
-		}
-	}
-	return escaped.String()
-}
