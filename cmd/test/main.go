@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
-	"github.com/containers/podman/v5/pkg/systemd/parser"
 )
 
 func main() {

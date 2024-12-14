@@ -1,19 +1,10 @@
 package validator
 
-import "github.com/containers/podman/v5/pkg/systemd/parser"
+import "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 
-type ValidationErrorLevel string
-
-const (
-	Error   ValidationErrorLevel = "error"
-	Warning ValidationErrorLevel = "warning"
-)
-
-type ValidationErrorType string
-
-const (
-	ParsingError ValidationErrorType = "parsing-error"
-)
+type Validator interface {
+	Validate(unitFile parser.UnitFile) []ValidationError
+}
 
 type ValidationError struct {
 	FilePath      string
@@ -28,6 +19,19 @@ type ValidationErrorPosition struct {
 	Line   int
 	Column int
 }
+
+type ValidationErrorLevel string
+
+const (
+	Error   ValidationErrorLevel = "error"
+	Warning ValidationErrorLevel = "warning"
+)
+
+type ValidationErrorType string
+
+const (
+	ParsingError ValidationErrorType = "parsing-error"
+)
 
 type ValidationErrors map[string][]ValidationError
 
@@ -66,8 +70,4 @@ func (errors ValidationErrors) Merge(other ValidationErrors) ValidationErrors {
 		errors.AddError(filePath, err...)
 	}
 	return errors
-}
-
-type Validator interface {
-	Validate(unitFile parser.UnitFile) []ValidationError
 }

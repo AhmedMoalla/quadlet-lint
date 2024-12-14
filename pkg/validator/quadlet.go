@@ -1,8 +1,6 @@
 package validator
 
-import (
-	"github.com/containers/podman/v5/pkg/systemd/parser"
-)
+import "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 
 type QuadletValidator struct {
 }
