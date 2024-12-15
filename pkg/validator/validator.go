@@ -29,10 +29,6 @@ const (
 
 type ErrorType string
 
-const (
-	ParsingError ErrorType = "parsing-error"
-)
-
 type ValidationErrors map[string][]ValidationError
 
 func (errors ValidationErrors) Level(level Level) []ValidationError {

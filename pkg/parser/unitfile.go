@@ -122,18 +122,18 @@ func NewUnitFile() *UnitFile {
 }
 
 // Load a unit file from disk, remembering the path and filename
-func ParseUnitFile(pathName string) (*UnitFile, *ParsingError) {
+func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 	data, e := os.ReadFile(pathName)
 	if e != nil {
-		return nil, &ParsingError{inner: e}
+		return nil, []ParsingError{{inner: e}}
 	}
 
 	f := NewUnitFile()
 	f.Path = pathName
 	f.Filename = path.Base(pathName)
 
-	if e := f.Parse(string(data)); e != nil {
-		return nil, e
+	if err := f.Parse(string(data)); err != nil {
+		return nil, err
 	}
 
 	return f, nil
@@ -306,7 +306,7 @@ func trimSpacesFromLines(data string) string {
 }
 
 // Parse an already loaded unit file (in the form of a string)
-func (f *UnitFile) Parse(data string) *ParsingError {
+func (f *UnitFile) Parse(data string) []ParsingError {
 	p := &UnitFileParser{
 		file:   f,
 		lineNr: 1,
@@ -314,6 +314,7 @@ func (f *UnitFile) Parse(data string) *ParsingError {
 
 	data = trimSpacesFromLines(data)
 
+	parsingErrors := make([]ParsingError, 0)
 	for len(data) > 0 {
 		origdata := data
 		nLines := 1
@@ -336,7 +337,7 @@ func (f *UnitFile) Parse(data string) *ParsingError {
 		}
 
 		if err := p.parseLine(line); err != nil {
-			return err
+			parsingErrors = append(parsingErrors, *err)
 		}
 
 		p.lineNr += nLines
@@ -347,7 +348,11 @@ func (f *UnitFile) Parse(data string) *ParsingError {
 		p.currentGroup = p.file.ensureGroup("")
 	}
 
-	return nil
+	if len(parsingErrors) == 0 {
+		return nil
+	}
+
+	return parsingErrors
 }
 
 func applyLineContinuation(raw string) string {

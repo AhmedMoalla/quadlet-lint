@@ -27,10 +27,10 @@ func main() {
 	errors := validationErrors.Merge(parsingErrors)
 	reportErrors(errors)
 
-	logSummary(unitFiles, errors)
+	logSummary(unitFilesPaths, errors)
 }
 
-func logSummary(unitFiles []parser.UnitFile, errors validator.ValidationErrors) {
+func logSummary(unitFiles []string, errors validator.ValidationErrors) {
 	var status string
 	if errors.HasErrors() {
 		status = "Failed"
@@ -38,7 +38,7 @@ func logSummary(unitFiles []parser.UnitFile, errors validator.ValidationErrors) 
 		status = "Passed"
 	}
 
-	fmt.Printf("%s: %d failure(s), %d warning(s) on %d files.\n",
+	fmt.Printf("%s: %d error(s), %d warning(s) on %d files.\n",
 		status, len(errors.Level(validator.Error)), len(errors.Level(validator.Warning)), len(unitFiles))
 }
 
@@ -68,15 +68,17 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 	errors := make(validator.ValidationErrors)
 	unitFiles := make([]parser.UnitFile, 0, len(unitFilesPaths))
 	for _, path := range unitFilesPaths {
-		unitFile, err := parser.ParseUnitFile(path)
-		if err != nil {
-			errors.AddError(path, validator.ValidationError{
-				FilePath:  path,
-				Level:     validator.Error,
-				Message:   err.Error(),
-				ErrorType: validator.ParsingError,
-				Position:  validator.Position{Line: err.Line, Column: err.Column},
-			})
+		unitFile, errs := parser.ParseUnitFile(path)
+		if errs != nil {
+			for _, err := range errs {
+				errors.AddError(path, validator.ValidationError{
+					FilePath:  path,
+					Level:     validator.Error,
+					Message:   err.Error(),
+					ErrorType: "parsing-error",
+					Position:  validator.Position{Line: err.Line, Column: err.Column},
+				})
+			}
 		} else if unitFile != nil {
 			unitFiles = append(unitFiles, *unitFile)
 		}
@@ -108,8 +110,8 @@ func reportErrors(errors validator.ValidationErrors) {
 
 			fmt.Printf("%s:\n", path)
 			for _, err := range errs {
-				fmt.Printf("\t-> [%s][%d:%d][%s] %s\n", err.Level, err.Position.Line, err.Position.Column,
-					err.ErrorType, err.Message)
+				fmt.Printf("\t-> [%s][%s][%d:%d] %s\n", err.Level, err.ErrorType, err.Position.Line,
+					err.Position.Column, err.Message)
 			}
 		}
 	}
