@@ -38,8 +38,8 @@ func logSummary(unitFiles []string, errors validator.ValidationErrors) {
 		status = "Passed"
 	}
 
-	fmt.Printf("%s: %d error(s), %d warning(s) on %d files.\n",
-		status, len(errors.Level(validator.Error)), len(errors.Level(validator.Warning)), len(unitFiles))
+	fmt.Printf("%s: %d error(s), %d warning(s) on %d files.\n", status,
+		len(errors.WhereLevel(validator.LevelError)), len(errors.WhereLevel(validator.LevelWarning)), len(unitFiles))
 }
 
 func readInputPath() string {
@@ -64,23 +64,23 @@ func findUnitFiles(inputDirOrFile string) []string {
 	return unitFilesPaths
 }
 
+var ParsingError = validator.ErrorType{
+	Name:          "parsing-error",
+	Level:         validator.LevelError,
+	ValidatorName: "parser",
+}
+
 func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.ValidationErrors) {
 	errors := make(validator.ValidationErrors)
 	unitFiles := make([]parser.UnitFile, 0, len(unitFilesPaths))
 	for _, path := range unitFilesPaths {
 		unitFile, errs := parser.ParseUnitFile(path)
-		if errs != nil {
-			for _, err := range errs {
-				errors.AddError(path, validator.ValidationError{
-					FilePath:  path,
-					Level:     validator.Error,
-					Message:   err.Error(),
-					ErrorType: "parsing-error",
-					Position:  validator.Position{Line: err.Line, Column: err.Column},
-				})
-			}
-		} else if unitFile != nil {
+		if unitFile != nil {
 			unitFiles = append(unitFiles, *unitFile)
+		}
+
+		for _, err := range errs {
+			errors.AddError(path, validator.Error(ParsingError, err.Line, err.Column, err.Error()))
 		}
 	}
 	return unitFiles, errors
@@ -110,8 +110,8 @@ func reportErrors(errors validator.ValidationErrors) {
 
 			fmt.Printf("%s:\n", path)
 			for _, err := range errs {
-				fmt.Printf("\t-> [%s][%s][%d:%d] %s\n", err.Level, err.ErrorType, err.Position.Line,
-					err.Position.Column, err.Message)
+				fmt.Printf("\t-> [%s][%s.%s][%d:%d] %s\n", err.Level, err.ValidatorName, err.ErrorType, err.Line,
+					err.Column, err.Message)
 			}
 		}
 	}

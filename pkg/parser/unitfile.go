@@ -132,11 +132,12 @@ func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 	f.Path = pathName
 	f.Filename = path.Base(pathName)
 
-	if err := f.Parse(string(data)); err != nil {
-		return nil, err
+	parsingErrors := f.Parse(string(data))
+	if len(parsingErrors) > 0 {
+		return nil, parsingErrors
 	}
 
-	return f, nil
+	return f, []ParsingError{}
 }
 
 func (f *UnitFile) ensureGroup(groupName string) *unitGroup {
@@ -346,10 +347,6 @@ func (f *UnitFile) Parse(data string) []ParsingError {
 	if p.currentGroup == nil {
 		// For files without groups, add an empty group name used only for initial comments
 		p.currentGroup = p.file.ensureGroup("")
-	}
-
-	if len(parsingErrors) == 0 {
-		return nil
 	}
 
 	return parsingErrors

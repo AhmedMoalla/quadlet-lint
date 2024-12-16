@@ -18,8 +18,6 @@ import (
 )
 
 var (
-	verboseFlag bool // True if -v passed
-	dryRunFlag  bool // True if -dryrun is used
 	versionFlag bool // True if -version is used
 )
 
@@ -42,22 +40,8 @@ func Logf(format string, a ...interface{}) {
 	s := fmt.Sprintf(format, a...)
 	line := fmt.Sprintf("quadlet-generator[%d]: %s", os.Getpid(), s)
 
-	if dryRunFlag {
-		fmt.Fprintf(os.Stderr, "%s\n", line)
-		os.Stderr.Sync()
-	}
-}
-
-var debugEnabled = false
-
-func enableDebug() {
-	debugEnabled = true
-}
-
-func Debugf(format string, a ...interface{}) {
-	if debugEnabled {
-		Logf(format, a...)
-	}
+	fmt.Fprintf(os.Stderr, "%s\n", line)
+	os.Stderr.Sync()
 }
 
 type searchPaths struct {
@@ -93,7 +77,7 @@ func appendSubPaths(paths *searchPaths, path string) {
 	resolvedPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			Debugf("Error occurred resolving path %q: %s", path, err)
+			Logf("Error occurred resolving path %q: %s", path, err)
 		}
 		// Despite the failure add the path to the list for logging purposes
 		// This is the equivalent of adding the path when info==nil below
@@ -112,7 +96,7 @@ func appendSubPaths(paths *searchPaths, path string) {
 	entries, err := os.ReadDir(resolvedPath)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			Debugf("Error occurred walking sub directories %q: %s", path, err)
+			Logf("Error occurred walking sub directories %q: %s", path, err)
 		}
 		return
 	}
@@ -138,7 +122,7 @@ func skipPath(paths *searchPaths, path string) bool {
 	stat, err := os.Stat(path)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			Debugf("Error occurred resolving path %q: %s", path, err)
+			Logf("Error occurred resolving path %q: %s", path, err)
 		}
 		return true
 	}
@@ -172,7 +156,7 @@ func loadUnitsFromDir(sourcePath string) ([]*parser.UnitFile, error) {
 		if _, ok := seen[name]; !ok && isExtSupported(name) {
 			path := path.Join(sourcePath, name)
 
-			Debugf("Loading source unit file %s", path)
+			Logf("Loading source unit file %s", path)
 
 			if f, err := parser.ParseUnitFile(path); err != nil {
 				err = fmt.Errorf("error loading %q, %w", path, err)
@@ -189,74 +173,6 @@ func loadUnitsFromDir(sourcePath string) ([]*parser.UnitFile, error) {
 	}
 
 	return units, prevError
-}
-
-func loadUnitDropins(unit *parser.UnitFile, sourcePaths []string) error {
-	var prevError error
-	reportError := func(err error) {
-		if prevError != nil {
-			err = fmt.Errorf("%s\n%s", prevError, err)
-		}
-		prevError = err
-	}
-
-	dropinDirs := []string{}
-	unitDropinPaths := unit.GetUnitDropinPaths()
-
-	for _, sourcePath := range sourcePaths {
-		for _, dropinPath := range unitDropinPaths {
-			dropinDirs = append(dropinDirs, path.Join(sourcePath, dropinPath))
-		}
-	}
-
-	var dropinPaths = make(map[string]string)
-	for _, dropinDir := range dropinDirs {
-		dropinFiles, err := os.ReadDir(dropinDir)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				reportError(fmt.Errorf("error reading directory %q, %w", dropinDir, err))
-			}
-
-			continue
-		}
-
-		for _, dropinFile := range dropinFiles {
-			dropinName := dropinFile.Name()
-			if filepath.Ext(dropinName) != ".conf" {
-				continue // Only *.conf supported
-			}
-
-			if _, ok := dropinPaths[dropinName]; ok {
-				continue // We already saw this name
-			}
-
-			dropinPaths[dropinName] = path.Join(dropinDir, dropinName)
-		}
-	}
-
-	dropinFiles := make([]string, len(dropinPaths))
-	i := 0
-	for k := range dropinPaths {
-		dropinFiles[i] = k
-		i++
-	}
-
-	// Merge in alpha-numerical order
-	sort.Strings(dropinFiles)
-
-	for _, dropinFile := range dropinFiles {
-		dropinPath := dropinPaths[dropinFile]
-
-		Debugf("Loading source drop-in file %s", dropinPath)
-
-		if f, err := parser.ParseUnitFile(dropinPath); err != nil {
-			reportError(fmt.Errorf("error loading %q, %w", dropinPath, err))
-		} else {
-			unit.Merge(f)
-		}
-	}
-
-	return prevError
 }
 
 func isImageID(imageName string) bool {
@@ -388,10 +304,6 @@ func process() error {
 		return prevError
 	}
 
-	if verboseFlag || dryRunFlag {
-		enableDebug()
-	}
-
 	reportError := func(err error) {
 		if prevError != nil {
 			err = fmt.Errorf("%s\n%s", prevError, err)
@@ -412,14 +324,8 @@ func process() error {
 	}
 
 	if len(units) == 0 {
-		Debugf("No files parsed from %s", sourcePathsMap)
+		Logf("No files parsed from %s", sourcePathsMap)
 		return prevError
-	}
-
-	for _, unit := range units {
-		if err := loadUnitDropins(unit, sourcePathsMap); err != nil {
-			reportError(err)
-		}
 	}
 
 	// Sort unit files according to potential inter-dependencies, with Volume and Network units
@@ -471,21 +377,17 @@ func process() error {
 			continue
 		}
 
-		if dryRunFlag {
-			data, err := service.ToString()
-			if err != nil {
-				reportError(fmt.Errorf("parsing %s: %w", service.Path, err))
-				continue
-			}
-			fmt.Printf("---%s---\n%s\n", service.Path, data)
+		data, err := service.ToString()
+		if err != nil {
+			reportError(fmt.Errorf("parsing %s: %w", service.Path, err))
 			continue
 		}
+		fmt.Printf("---%s---\n%s\n", service.Path, data)
+		continue
 	}
 	return prevError
 }
 
 func init() {
-	flag.BoolVar(&verboseFlag, "v", false, "Print debug information")
-	flag.BoolVar(&dryRunFlag, "dryrun", false, "Run in dryrun mode printing debug information")
 	flag.BoolVar(&versionFlag, "version", false, "Print version information and exit")
 }

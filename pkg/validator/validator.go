@@ -6,32 +6,42 @@ type Validator interface {
 	Validate(unitFile parser.UnitFile) []ValidationError
 }
 
-type ValidationError struct {
-	FilePath      string
-	Position      Position
-	Level         Level
-	ErrorType     ErrorType
-	ValidatorName string
-	Message       string
+func Error(errType ErrorType, line, column int, message string) ValidationError {
+	return ValidationError{
+		ErrorType: errType,
+		Location:  Location{Line: line, Column: column},
+		Message:   message,
+	}
 }
 
-type Position struct {
-	Line   int
-	Column int
+type ValidationError struct {
+	ErrorType
+	Location
+	Message string
+}
+
+type ErrorType struct {
+	Name          string
+	Level         Level
+	ValidatorName string
+}
+
+type Location struct {
+	FilePath string
+	Line     int
+	Column   int
 }
 
 type Level string
 
 const (
-	Error   Level = "error"
-	Warning Level = "warning"
+	LevelError   Level = "error"
+	LevelWarning Level = "warning"
 )
-
-type ErrorType string
 
 type ValidationErrors map[string][]ValidationError
 
-func (errors ValidationErrors) Level(level Level) []ValidationError {
+func (errors ValidationErrors) WhereLevel(level Level) []ValidationError {
 	levelErrors := make([]ValidationError, 0)
 
 	for _, errs := range errors {
@@ -46,12 +56,7 @@ func (errors ValidationErrors) Level(level Level) []ValidationError {
 }
 
 func (errors ValidationErrors) HasErrors() bool {
-	for _, errs := range errors {
-		if len(errs) > 0 {
-			return true
-		}
-	}
-	return false
+	return len(errors.WhereLevel(LevelError)) > 0
 }
 
 func (errors ValidationErrors) AddError(filePath string, err ...ValidationError) {
