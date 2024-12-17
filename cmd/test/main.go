@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/quadlet"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -80,7 +81,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 		}
 
 		for _, err := range errs {
-			errors.AddError(path, validator.Error(ParsingError, err.Line, err.Column, err.Error()))
+			errors.AddError(path, *validator.Error(ParsingError, err.Line, err.Column, err.Error()))
 		}
 	}
 	return unitFiles, errors
@@ -89,7 +90,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 func validateUnitFiles(unitFiles []parser.UnitFile) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
-		validator.QuadletValidator{},
+		quadlet.Validator{},
 	}
 
 	for _, file := range unitFiles {
@@ -110,8 +111,8 @@ func reportErrors(errors validator.ValidationErrors) {
 
 			fmt.Printf("%s:\n", path)
 			for _, err := range errs {
-				fmt.Printf("\t-> [%s][%s.%s][%d:%d] %s\n", err.Level, err.ValidatorName, err.ErrorType, err.Line,
-					err.Column, err.Message)
+				fmt.Printf("\t-> [%s][%s][%d:%d] %s\n", err.Level, err.ErrorType, err.Line, err.Column,
+					err.Message)
 			}
 		}
 	}
