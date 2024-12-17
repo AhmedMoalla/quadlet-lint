@@ -2,10 +2,12 @@ package quadlet
 
 import (
 	"fmt"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
 func appendError(errors []validator.ValidationError, err *validator.ValidationError) []validator.ValidationError {
@@ -15,7 +17,43 @@ func appendError(errors []validator.ValidationError, err *validator.ValidationEr
 	return errors
 }
 
-func checkForUnknownKeys(unit *parser.UnitFile, groupName string, supportedKeys map[string]bool) *validator.ValidationError {
+func checkForRequiredKey(unit parser.UnitFile, groupName string, requiredKeyCandidates ...string) *validator.ValidationError {
+	for _, key := range requiredKeyCandidates {
+		if value, _ := unit.Lookup(groupName, key); len(value) > 0 {
+			return nil
+		}
+	}
+	return validator.Error(RequiredKey, 0, 0,
+		fmt.Sprintf("at least one of these keys is required: %s", requiredKeyCandidates))
+}
+
+func checkForKeyConflict(unit parser.UnitFile, groupName string, conflictingKeys ...string) *validator.ValidationError {
+	keysFound := make([]string, 0, len(conflictingKeys))
+	for _, key := range conflictingKeys {
+		if value, _ := unit.Lookup(groupName, key); len(value) > 0 {
+			keysFound = append(keysFound, key)
+		}
+	}
+
+	if len(keysFound) <= 1 {
+		return nil
+	}
+
+	return validator.Error(KeyConflict, 0, 0,
+		fmt.Sprintf("the keys %s cannot be specified together", keysFound))
+}
+
+func checkForInvalidValue(unit parser.UnitFile, groupName string, key string, allowedValues ...string) *validator.ValidationError {
+	value, ok := unit.Lookup(groupName, key)
+	if ok && !slices.Contains(allowedValues, value) {
+		return validator.Error(InvalidValue, 0, 0,
+			fmt.Sprintf("invalid value '%s' for key '[%s]%s'. Allowed values: %s",
+				value, groupName, key, allowedValues))
+	}
+	return nil
+}
+
+func checkForUnknownKeys(unit parser.UnitFile, groupName string, supportedKeys map[string]bool) *validator.ValidationError {
 	err := checkForUnknownKeysInSpecificGroup(unit, groupName, supportedKeys)
 	if err == nil {
 		return checkForUnknownKeysInSpecificGroup(unit, QuadletGroup, supportedQuadletKeys)
@@ -24,7 +62,7 @@ func checkForUnknownKeys(unit *parser.UnitFile, groupName string, supportedKeys 
 	return err
 }
 
-func checkForUnknownKeysInSpecificGroup(unit *parser.UnitFile, groupName string, supportedKeys map[string]bool) *validator.ValidationError {
+func checkForUnknownKeysInSpecificGroup(unit parser.UnitFile, groupName string, supportedKeys map[string]bool) *validator.ValidationError {
 	keys := unit.ListKeys(groupName)
 	for _, key := range keys {
 		if !supportedKeys[key] {

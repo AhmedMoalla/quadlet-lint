@@ -318,10 +318,10 @@ const (
 	KeyPull                  = "Pull"
 	KeyReadOnly              = "ReadOnly"
 	KeyReadOnlyTmpfs         = "ReadOnlyTmpfs"
-	KeyRemapGid              = "RemapGid"     //nolint:stylecheck // deprecated
-	KeyRemapUid              = "RemapUid"     //nolint:stylecheck // deprecated
-	KeyRemapUidSize          = "RemapUidSize" //nolint:stylecheck // deprecated
-	KeyRemapUsers            = "RemapUsers"   //nolint:stylecheck // deprecated
+	KeyRemapGid              = "RemapGid"     // deprecated
+	KeyRemapUid              = "RemapUid"     // deprecated
+	KeyRemapUidSize          = "RemapUidSize" // deprecated
+	KeyRemapUsers            = "RemapUsers"   // deprecated
 	KeyRootfs                = "Rootfs"
 	KeyRunInit               = "RunInit"
 	KeySeccompProfile        = "SeccompProfile"
@@ -352,11 +352,14 @@ const (
 	KeyUser                  = "User"
 	KeyUserNS                = "UserNS"
 	KeyVariant               = "Variant"
-	KeyVolatileTmp           = "VolatileTmp" //nolint:stylecheck // deprecated
+	KeyVolatileTmp           = "VolatileTmp" // deprecated
 	KeyVolume                = "Volume"
 	KeyVolumeName            = "VolumeName"
 	KeyWorkingDir            = "WorkingDir"
 	KeyYaml                  = "Yaml"
+	// service group keys
+
+	KeyKillMode = "KillMode"
 )
 
 // Names of commonly used systemd/quadlet group names

@@ -12,6 +12,8 @@ var (
 	UnknownKey         = validator.NewErrorType("unknown-key", validator.LevelError, ValidatorName)
 	RequiredKey        = validator.NewErrorType("required-key", validator.LevelError, ValidatorName)
 	KeyConflict        = validator.NewErrorType("key-conflict", validator.LevelError, ValidatorName)
+	InvalidValue       = validator.NewErrorType("invalid-value", validator.LevelError, ValidatorName)
+	DeprecatedKey      = validator.NewErrorType("deprecated-key", validator.LevelError, ValidatorName)
 )
 
 var validators = map[parser.UnitType]validator.Validator{
