@@ -20,6 +20,10 @@ type ValidationError struct {
 	Message string
 }
 
+func (err ValidationError) Error() string {
+	return err.Message
+}
+
 func (err ValidationError) String() string {
 	return err.ErrorType.String()
 }

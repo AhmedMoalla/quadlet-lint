@@ -20,13 +20,25 @@ func (c ContainerValidator) Validate(unit parser.UnitFile) []validator.Validatio
 	validationErrors = appendError(validationErrors, checkForRequiredKey(unit, ContainerGroup, KeyImage, KeyRootfs))
 	validationErrors = appendError(validationErrors, checkForKeyConflict(unit, ContainerGroup, KeyImage, KeyRootfs))
 	// Only allow mixed or control-group, as nothing else works well
+	// TODO: Refactor this so that the api looks like this: validator.InvalidValue.Check(unit, ...) ?
 	validationErrors = appendError(validationErrors, checkForInvalidValue(unit, ServiceGroup, KeyKillMode, "mixed", "control-group"))
 	validationErrors = appendError(validationErrors, checkIfNetworksValid(unit))
 	validationErrors = appendError(validationErrors, checkForInvalidValue(unit, ServiceGroup, KeyType, "notify", "oneshot"))
 	validationErrors = appendError(validationErrors, checkIfUserAndGroupValid(unit))
 	validationErrors = appendError(validationErrors, checkIfUserMappingsValid(unit, ContainerGroup, true))
+	validationErrors = appendError(validationErrors, checkIfPortsValid(unit))
+	validationErrors = appendError(validationErrors, checkIfPodValid(unit))
 
 	return validationErrors
+}
+
+func checkIfPodValid(unit parser.UnitFile) *validator.ValidationError {
+	pod, ok := unit.Lookup(ContainerGroup, KeyPod)
+	if ok && len(pod) > 0 && !strings.HasSuffix(pod, ".pod") {
+		return validator.Error(InvalidValue, 0, 0, fmt.Sprintf("pod %s is not Quadlet based", pod))
+	}
+
+	return nil
 }
 
 func checkIfPortsValid(unit parser.UnitFile) *validator.ValidationError {
