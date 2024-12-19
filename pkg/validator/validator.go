@@ -6,18 +6,28 @@ type Validator interface {
 	Validate(unitFile parser.UnitFile) []ValidationError
 }
 
-func Error(errType ErrorType, line, column int, message string) *ValidationError {
-	return &ValidationError{
-		ErrorType: errType,
-		Location:  Location{Line: line, Column: column},
-		Message:   message,
-	}
-}
+var (
+	UnknownKey    = NewErrorType("unknown-key", LevelError)
+	RequiredKey   = NewErrorType("required-key", LevelError)
+	KeyConflict   = NewErrorType("key-conflict", LevelError)
+	InvalidValue  = NewErrorType("invalid-value", LevelError)
+	DeprecatedKey = NewErrorType("deprecated-key", LevelError)
+)
 
 type ValidationError struct {
 	ErrorType
 	Location
-	Message string
+	Message       string
+	ValidatorName string
+}
+
+func Error(validatorName string, errType ErrorType, line, column int, message string) *ValidationError {
+	return &ValidationError{
+		ErrorType:     errType,
+		Location:      Location{Line: line, Column: column},
+		Message:       message,
+		ValidatorName: validatorName,
+	}
 }
 
 func (err ValidationError) Error() string {
@@ -34,16 +44,15 @@ type ErrorType struct {
 	ValidatorName string
 }
 
-func (err ErrorType) String() string {
-	return err.ValidatorName + "." + err.Name
+func NewErrorType(name string, level Level) ErrorType {
+	return ErrorType{
+		Name:  name,
+		Level: level,
+	}
 }
 
-func NewErrorType(name string, level Level, validatorName string) ErrorType {
-	return ErrorType{
-		Name:          name,
-		Level:         level,
-		ValidatorName: validatorName,
-	}
+func (t ErrorType) String() string {
+	return t.ValidatorName + "." + t.Name
 }
 
 type Location struct {

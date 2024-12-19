@@ -90,7 +90,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 func validateUnitFiles(unitFiles []parser.UnitFile) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
-		quadlet.Validator{},
+		quadlet.Validator(),
 	}
 
 	for _, file := range unitFiles {

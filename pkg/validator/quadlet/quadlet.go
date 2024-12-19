@@ -8,16 +8,11 @@ import (
 const ValidatorName = "quadlet"
 
 var (
-	AmbiguousImageName = validator.NewErrorType("ambiguous-image-name", validator.LevelWarning, ValidatorName)
-	UnknownKey         = validator.NewErrorType("unknown-key", validator.LevelError, ValidatorName)
-	RequiredKey        = validator.NewErrorType("required-key", validator.LevelError, ValidatorName)
-	KeyConflict        = validator.NewErrorType("key-conflict", validator.LevelError, ValidatorName)
-	InvalidValue       = validator.NewErrorType("invalid-value", validator.LevelError, ValidatorName)
-	DeprecatedKey      = validator.NewErrorType("deprecated-key", validator.LevelError, ValidatorName)
+	AmbiguousImageName = validator.NewErrorType("ambiguous-image-name", validator.LevelWarning)
 )
 
 var validators = map[parser.UnitType]validator.Validator{
-	parser.UnitTypeContainer: ContainerValidator{},
+	parser.UnitTypeContainer: containerValidator{ValidatorName: "container"},
 	parser.UnitTypeVolume:    noOpValidator{},
 	parser.UnitTypeKube:      noOpValidator{},
 	parser.UnitTypeNetwork:   noOpValidator{},
@@ -26,9 +21,15 @@ var validators = map[parser.UnitType]validator.Validator{
 	parser.UnitTypePod:       noOpValidator{},
 }
 
-type Validator struct{}
+func Validator() validator.Validator {
+	return quadletValidator{ValidatorName: ValidatorName}
+}
 
-func (q Validator) Validate(unit parser.UnitFile) []validator.ValidationError {
+type quadletValidator struct {
+	ValidatorName string
+}
+
+func (q quadletValidator) Validate(unit parser.UnitFile) []validator.ValidationError {
 	return validators[unit.UnitType].Validate(unit)
 }
 
