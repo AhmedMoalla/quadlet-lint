@@ -7,7 +7,18 @@ import (
 )
 
 type Validator interface {
+	Name() string
+	Context() Context
 	Validate(unitFile parser.UnitFile) []ValidationError
+}
+
+type Context struct {
+	Options
+	AllUnitFiles []parser.UnitFile
+}
+
+type Options struct {
+	CheckReferences bool
 }
 
 var (
@@ -25,8 +36,8 @@ type ValidationError struct {
 	ValidatorName string
 }
 
-func Error(validatorName string, errType ErrorType, line, column int, message string) *ValidationError {
-	return &ValidationError{
+func Error(validatorName string, errType ErrorType, line, column int, message string) ValidationError {
+	return ValidationError{
 		ErrorType:     errType,
 		Location:      Location{Line: line, Column: column},
 		Message:       message,

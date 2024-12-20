@@ -14,7 +14,20 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
+// args
+var (
+	debug           bool
+	checkReferences bool // true if -check-references is passed
+)
+
+func init() {
+	flag.BoolVar(&debug, "debug", false, "Print debug logs")
+	flag.BoolVar(&checkReferences, "check-references", false, "Check references to other Quadlet files")
+}
+
 func main() {
+	flag.Parse()
+
 	inputPath := readInputPath()
 	unitFilesPaths := findUnitFiles(inputPath)
 	if len(unitFilesPaths) == 0 {
@@ -24,7 +37,7 @@ func main() {
 
 	unitFiles, parsingErrors := parseUnitFiles(unitFilesPaths)
 
-	validationErrors := validateUnitFiles(unitFiles)
+	validationErrors := validateUnitFiles(unitFiles, checkReferences)
 
 	errors := validationErrors.Merge(parsingErrors)
 	reportErrors(errors)
@@ -82,16 +95,16 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 		}
 
 		for _, err := range errs {
-			errors.AddError(path, *validator.Error("", ParsingError, err.Line, err.Column, err.Error()))
+			errors.AddError(path, validator.Error("", ParsingError, err.Line, err.Column, err.Error()))
 		}
 	}
 	return unitFiles, errors
 }
 
-func validateUnitFiles(unitFiles []parser.UnitFile) validator.ValidationErrors {
+func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
-		quadlet.Validator(),
+		quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
 	}
 
 	for _, file := range unitFiles {

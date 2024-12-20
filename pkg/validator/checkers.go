@@ -10,7 +10,7 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 )
 
-type CheckerFn func(validatorName string, unit parser.UnitFile) *ValidationError
+type CheckerFn func(validator Validator, unit parser.UnitFile) []ValidationError
 type PredicateFn func(value string) bool
 type Predicate struct {
 	fn             PredicateFn
@@ -49,32 +49,36 @@ func (p *Predicate) And(other *Predicate) *Predicate {
 	}
 }
 
-func DoChecks(validatorName string, unit parser.UnitFile, checkers ...CheckerFn) []ValidationError {
+func ErrorAsSlice(validatorName string, errType ErrorType, line, column int, message string) []ValidationError {
+	return []ValidationError{Error(validatorName, errType, line, column, message)}
+}
+
+func DoChecks(validator Validator, unit parser.UnitFile, checkers ...CheckerFn) []ValidationError {
 	validationErrors := make([]ValidationError, 0, len(checkers))
 	for _, checker := range checkers {
-		err := checker(validatorName, unit)
+		err := checker(validator, unit)
 		if err != nil {
-			validationErrors = append(validationErrors, *err)
+			validationErrors = append(validationErrors, err...)
 		}
 	}
 	return validationErrors
 }
 
 func CheckForRequiredKey(groupName string, requiredKeyCandidates ...string) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("CheckForRequiredKey:", unit.Filename, groupName, requiredKeyCandidates)
 		for _, key := range requiredKeyCandidates {
 			if value, _ := unit.Lookup(groupName, key); len(value) > 0 {
 				return nil
 			}
 		}
-		return Error(validatorName, RequiredKey, 0, 0,
+		return ErrorAsSlice(validator.Name(), RequiredKey, 0, 0,
 			fmt.Sprintf("at least one of these keys is required: %s", requiredKeyCandidates))
 	}
 }
 
 func CheckForKeyConflict(groupName string, conflictingKeys ...string) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("CheckForKeyConflict:", unit.Filename, groupName, conflictingKeys)
 		keysFound := make([]string, 0, len(conflictingKeys))
 		for _, key := range conflictingKeys {
@@ -87,17 +91,17 @@ func CheckForKeyConflict(groupName string, conflictingKeys ...string) CheckerFn 
 			return nil
 		}
 
-		return Error(validatorName, KeyConflict, 0, 0,
+		return ErrorAsSlice(validator.Name(), KeyConflict, 0, 0,
 			fmt.Sprintf("the keys %s cannot be specified together", keysFound))
 	}
 }
 
 func CheckForAllowedValues(groupName string, key string, allowedValues ...string) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("CheckForAllowedValues:", unit.Filename, groupName, key, allowedValues)
 		value, ok := unit.Lookup(groupName, key)
 		if ok && !slices.Contains(allowedValues, value) {
-			return Error(validatorName, InvalidValue, 0, 0,
+			return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0,
 				fmt.Sprintf("invalid value '%s' for key '[%s]%s'. Allowed values: %s",
 					value, groupName, key, allowedValues))
 		}
@@ -106,12 +110,12 @@ func CheckForAllowedValues(groupName string, key string, allowedValues ...string
 }
 
 func CheckForUnknownKeys(groupName string, supportedKeys map[string]bool) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("CheckForUnknownKeys:", unit.Filename, groupName)
 		keys := unit.ListKeys(groupName)
 		for _, key := range keys {
 			if !supportedKeys[key] {
-				return Error(validatorName, UnknownKey, 0, 0,
+				return ErrorAsSlice(validator.Name(), UnknownKey, 0, 0,
 					fmt.Sprintf("unsupported key '%s' in group '%s' in %s", key, groupName, unit.Path))
 			}
 		}
@@ -120,7 +124,7 @@ func CheckForUnknownKeys(groupName string, supportedKeys map[string]bool) Checke
 	}
 }
 
-func CheckForInvalidValuesWithPredicateFn(groupName string, key string, predicate PredicateFn, message string, args ...string) CheckerFn {
+func CheckForInvalidValuesWithPredicateFn(groupName string, key string, predicate PredicateFn, message string, args ...any) CheckerFn {
 	return CheckForInvalidValuesWithMessage(groupName, key, &Predicate{fn: predicate}, message, args...)
 }
 
@@ -130,21 +134,21 @@ func CheckForInvalidValues(groupName string, key string, predicate *Predicate) C
 	})
 }
 
-func CheckForInvalidValuesWithMessage(groupName string, key string, predicate *Predicate, message string, args ...string) CheckerFn {
+func CheckForInvalidValuesWithMessage(groupName string, key string, predicate *Predicate, message string, args ...any) CheckerFn {
 	return checkForInvalidValues(groupName, key, predicate, func(value string) string {
-		return fmt.Sprintf(strings.Replace(message, "{value}", value, 1), args)
+		return fmt.Sprintf(strings.Replace(message, "{value}", value, 1), args...)
 	})
 }
 
 func checkForInvalidValues(groupName string, key string, predicate *Predicate, message func(value string) string) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("checkForInvalidValues:", unit.Filename, groupName, key)
 		values := unit.LookupAll(groupName, key)
 		for _, value := range values {
 			value := strings.TrimSpace(value)
 			if predicate.fn(value) {
 				// TODO: Make CheckerFn return list of ValidationErrors and return all of them here
-				return Error(validatorName, InvalidValue, 0, 0, message(value))
+				return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0, message(value))
 			}
 		}
 		return nil
@@ -164,11 +168,11 @@ func CheckForInvalidValueWithMessage(groupName string, key string, predicate *Pr
 }
 
 func checkForInvalidValue(groupName string, key string, predicate *Predicate, message func(value string) string) CheckerFn {
-	return func(validatorName string, unit parser.UnitFile) *ValidationError {
+	return func(validator Validator, unit parser.UnitFile) []ValidationError {
 		fmt.Println("checkForInvalidValue:", unit.Filename, groupName, key)
 		value, ok := unit.Lookup(groupName, key)
 		if ok && predicate.fn(value) {
-			return Error(validatorName, InvalidValue, 0, 0, message(value))
+			return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0, message(value))
 		}
 		return nil
 	}
