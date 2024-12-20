@@ -1,6 +1,10 @@
 package validator
 
-import "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+import (
+	"fmt"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+)
 
 type Validator interface {
 	Validate(unitFile parser.UnitFile) []ValidationError
@@ -35,7 +39,7 @@ func (err ValidationError) Error() string {
 }
 
 func (err ValidationError) String() string {
-	return err.ErrorType.String()
+	return fmt.Sprintf("%s.%s", err.ValidatorName, err.ErrorType.Name)
 }
 
 type ErrorType struct {
@@ -49,10 +53,6 @@ func NewErrorType(name string, level Level) ErrorType {
 		Name:  name,
 		Level: level,
 	}
-}
-
-func (t ErrorType) String() string {
-	return t.ValidatorName + "." + t.Name
 }
 
 type Location struct {
