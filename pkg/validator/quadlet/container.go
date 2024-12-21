@@ -2,10 +2,11 @@ package quadlet
 
 import (
 	"fmt"
-	"github.com/containers/storage/pkg/regexp"
+	"regexp"
 
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
 
 type containerValidator struct {
@@ -22,64 +23,63 @@ func (c containerValidator) Context() V.Context {
 }
 
 var (
-	exposeHostPortRegexp = regexp.Delayed(`\d+(-\d+)?(/udp|/tcp)?$`)
-	networkRegexp        = regexp.Delayed(`^[^:]+(:(?:\w+=[^,]+,?)+$)*`)
+	exposeHostPortRegexp = regexp.MustCompile(`\d+(-\d+)?(/udp|/tcp)?$`)
+	networkRegexp        = regexp.MustCompile(`^[^:]+(:(?:\w+=[^,]+,?)+$)*`)
 )
 
-func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
-	return V.DoChecks(c, unit) //CheckForAmbiguousImageName(ContainerGroup),
-
-	// One image or rootfs must be specified for the container
-	//V.CheckForRequiredKey(ContainerGroup, KeyImage, KeyRootfs),
-	//V.CheckForKeyConflict(ContainerGroup, KeyImage, KeyRootfs),
-
-	// Check if image refers to an existing .image or .build quadlet
-	//CheckForInvalidReference(ContainerGroup, KeyImage),
-	//CheckForInvalidReference(ContainerGroup, KeyRootfs),
-
-	// Only allow mixed or control-group, as nothing else works well
-	//V.CheckForAllowedValues(ServiceGroup, KeyKillMode, "mixed", "control-group"),
-
-	// When referring to a .container quadlet options are not supported
-	//V.CheckForInvalidValuesWithPredicateFn(ContainerGroup, KeyNetwork, func(network string) bool {
-	//	networkName, _, found := strings.Cut(network, ":")
-	//	return found && strings.HasSuffix(networkName, ".container")
-	//}, "'{value}' is invalid because extra options are not supported when joining another container's network"),
-
-	// Check if network refers to an existing .network or .container
-	//CheckForInvalidReferences(ContainerGroup, KeyNetwork),
-
-	//V.CheckForAllowedValues(ServiceGroup, KeyType, "notify", "oneshot"),
-
-	//checkForValidUserAndGroup,
-	//CheckForUserMappings(ContainerGroup, true),
-
-	//V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
-	//	V.MatchesRegex(exposeHostPortRegexp).Negate(),
-	//	"'{value}' has invalid port format"),
-
-	// Check if pod refers to an existing .pod quadlet
-	//V.CheckForInvalidValue(ContainerGroup, KeyPod,
-	//	V.HasLength().And(V.HasSuffix(".pod").Negate())),
-	//CheckForInvalidReference(ContainerGroup, KeyPod),
-
-	// Check if volume refers to an existing .volume quadlet
-	//CheckForInvalidReferences(ContainerGroup, KeyVolume),
-	//CheckForInvalidReferences(ContainerGroup, KeyMount),
-
-}
-
-func checkForValidUserAndGroup(validator V.Validator, unit parser.UnitFile) []V.ValidationError {
-	fmt.Println("checkForValidUserAndGroup:", unit.Filename)
-	user, hasUser := unit.Lookup(ContainerGroup, KeyUser)
-	okUser := hasUser && len(user) > 0
-
-	group, hasGroup := unit.Lookup(ContainerGroup, KeyGroup)
-	okGroup := hasGroup && len(group) > 0
-
-	if !okUser && okGroup {
-		return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0, "invalid Group set without User")
-	}
-
-	return nil
+// TODO: Implement all these checks in the parser
+// TODO: All present values should not be empty
+// Check if we have keys that are not listed in the spec
+// V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
+// V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
+func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
+	return CheckRules(c, unit, Groups{
+		Container: Container{
+			Rootfs: Rules(
+				RequiredIfNotPresent(Image),
+				ConflictsWith(Image),
+				CanReference(P.UnitTypeImage, P.UnitTypeBuild),
+			),
+			Image: Rules(
+				ImageNotAmbiguous,
+				RequiredIfNotPresent(Rootfs),
+				ConflictsWith(Rootfs),
+				CanReference(P.UnitTypeImage, P.UnitTypeBuild),
+			),
+			Network: Rules(
+				CanReference(P.UnitTypeNetwork, P.UnitTypeContainer),
+				ValuesMust(MatchRegexp(*networkRegexp), Always, "Network value has an invalid format."),
+				ValuesMust(HaveFormat(NetworkFormat), Always),
+			),
+			Volume: Rules(CanReference(P.UnitTypeVolume)),
+			Mount:  Rules(CanReference(P.UnitTypeVolume)),
+			Pod: Rules(
+				HasSuffix(".pod"), // TODO: Add extension as field to UnitType and refer to this as `UnitTypePod.Ext`
+				CanReference(P.UnitTypePod),
+			),
+			Group: Rules(DependsOn(User)),
+			RemapUid: Rules(
+				Deprecated, ConflictsWithNewUserMappingKeys,
+				DependsOn(RemapUsers),
+				ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id", "auto"),
+					"RemapUsers=keep-id supports only a single value for UID mapping"),
+			),
+			RemapGid: Rules(
+				Deprecated, ConflictsWithNewUserMappingKeys,
+				DependsOn(RemapUsers),
+				ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id", "auto"),
+					"RemapUsers=keep-id supports only a single value for GID mapping"),
+			),
+			RemapUsers: Rules(
+				Deprecated, ConflictsWithNewUserMappingKeys,
+				AllowedValues("manual", "auto", "keep-id"),
+			),
+			ExposeHostPort: Rules(ValuesMust(MatchRegexp(*exposeHostPortRegexp), Always,
+				fmt.Sprintf("ExposeHostPort invalid port format. Must match regexp '%s'", exposeHostPortRegexp))),
+		},
+		Service: Service{
+			KillMode: Rules(AllowedValues("mixed", "control-group")),
+			Type:     Rules(AllowedValues("notify", "oneshot")),
+		},
+	})
 }

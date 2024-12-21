@@ -9,7 +9,6 @@ const ValidatorName = "quadlet"
 
 var (
 	AmbiguousImageName = validator.NewErrorType("ambiguous-image-name", validator.LevelWarning)
-	InvalidReference   = validator.NewErrorType("invalid-reference", validator.LevelError)
 )
 
 func Validator(units []parser.UnitFile, options validator.Options) validator.Validator {

@@ -103,8 +103,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
-		quadlet.NewValidator{VName: "new", VContext: validator.Context{AllUnitFiles: unitFiles, Options: validator.Options{CheckReferences: checkReferences}}},
-		//quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
+		quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
 	}
 
 	for _, file := range unitFiles {
