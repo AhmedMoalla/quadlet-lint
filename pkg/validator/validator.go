@@ -9,7 +9,7 @@ import (
 type Validator interface {
 	Name() string
 	Context() Context
-	Validate(unitFile parser.UnitFile) []ValidationError
+	Validate(unit parser.UnitFile) []ValidationError
 }
 
 type Context struct {
@@ -22,11 +22,12 @@ type Options struct {
 }
 
 var (
-	UnknownKey    = NewErrorType("unknown-key", LevelError)
-	RequiredKey   = NewErrorType("required-key", LevelError)
-	KeyConflict   = NewErrorType("key-conflict", LevelError)
-	InvalidValue  = NewErrorType("invalid-value", LevelError)
-	DeprecatedKey = NewErrorType("deprecated-key", LevelError)
+	UnknownKey            = NewErrorType("unknown-key", LevelError)
+	RequiredKey           = NewErrorType("required-key", LevelError)
+	KeyConflict           = NewErrorType("key-conflict", LevelError)
+	InvalidValue          = NewErrorType("invalid-value", LevelError)
+	DeprecatedKey         = NewErrorType("deprecated-key", LevelWarning)
+	UnsatisfiedDependency = NewErrorType("unsatisfied-dependency", LevelError)
 )
 
 type ValidationError struct {

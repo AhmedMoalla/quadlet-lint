@@ -2,12 +2,10 @@ package quadlet
 
 import (
 	"fmt"
-	"slices"
-	"strings"
-	"unicode"
-
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	"slices"
+	"strings"
 )
 
 var referenceableUnitType = []parser.UnitType{parser.UnitTypeBuild, parser.UnitTypeImage, parser.UnitTypeNetwork,
@@ -164,49 +162,4 @@ func CheckForAmbiguousImageName(group string) V.CheckerFn {
 
 		return nil
 	}
-}
-
-func isUnambiguousName(imageName string) bool {
-	// Fully specified image ids are unambiguous
-	if isImageID(imageName) {
-		return true
-	}
-
-	// Otherwise we require a fully qualified name
-	firstSlash := strings.Index(imageName, "/")
-	if firstSlash == -1 {
-		// No domain or path, not fully qualified
-		return false
-	}
-
-	// What is before the first slash can be a domain or a path
-	domain := imageName[:firstSlash]
-
-	// If its a domain (has dot or port or is "localhost") it is considered fq
-	if strings.ContainsAny(domain, ".:") || domain == "localhost" {
-		return true
-	}
-
-	return false
-}
-
-func isImageID(imageName string) bool {
-	// All sha25:... names are assumed by podman to be fully specified
-	if strings.HasPrefix(imageName, "sha256:") {
-		return true
-	}
-
-	// However, podman also accepts image ids as pure hex strings,
-	// but only those of length 64 are unambiguous image ids
-	if len(imageName) != 64 {
-		return false
-	}
-
-	for _, c := range imageName {
-		if !unicode.Is(unicode.Hex_Digit, c) {
-			return false
-		}
-	}
-
-	return true
 }

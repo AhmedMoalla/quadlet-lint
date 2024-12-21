@@ -27,30 +27,25 @@ var (
 	exposeHostPortRegexp = regexp.Delayed(`\d+(-\d+)?(/udp|/tcp)?$`)
 )
 
-// TODO:
-// - Add format checks for every key
-// - Implement spec
-// - Add logging to display in debug mode
-// - Add source of the rule in the specification
-// - Add line and column numbers on the parser's level -> Each entry should have a line associated with it and the starting column of the value
 func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 	return V.DoChecks(c, unit,
-		CheckForAmbiguousImageName(ContainerGroup),
+		//CheckForAmbiguousImageName(ContainerGroup),
 
+		// TODO: All present values should not be empty
 		// Check if we have keys that are not listed in the spec
 		V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
 		V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
 
 		// One image or rootfs must be specified for the container
-		V.CheckForRequiredKey(ContainerGroup, KeyImage, KeyRootfs),
-		V.CheckForKeyConflict(ContainerGroup, KeyImage, KeyRootfs),
+		//V.CheckForRequiredKey(ContainerGroup, KeyImage, KeyRootfs),
+		//V.CheckForKeyConflict(ContainerGroup, KeyImage, KeyRootfs),
 
 		// Check if image refers to an existing .image or .build quadlet
-		CheckForInvalidReference(ContainerGroup, KeyImage),
-		CheckForInvalidReference(ContainerGroup, KeyRootfs),
+		//CheckForInvalidReference(ContainerGroup, KeyImage),
+		//CheckForInvalidReference(ContainerGroup, KeyRootfs),
 
 		// Only allow mixed or control-group, as nothing else works well
-		V.CheckForAllowedValues(ServiceGroup, KeyKillMode, "mixed", "control-group"),
+		//V.CheckForAllowedValues(ServiceGroup, KeyKillMode, "mixed", "control-group"),
 
 		// When referring to a .container quadlet options are not supported
 		V.CheckForInvalidValuesWithPredicateFn(ContainerGroup, KeyNetwork, func(network string) bool {
@@ -59,25 +54,25 @@ func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 		}, "'{value}' is invalid because extra options are not supported when joining another container's network"),
 
 		// Check if network refers to an existing .network or .container
-		CheckForInvalidReferences(ContainerGroup, KeyNetwork),
+		//CheckForInvalidReferences(ContainerGroup, KeyNetwork),
 
-		V.CheckForAllowedValues(ServiceGroup, KeyType, "notify", "oneshot"),
+		//V.CheckForAllowedValues(ServiceGroup, KeyType, "notify", "oneshot"),
 
-		checkForValidUserAndGroup,
-		CheckForUserMappings(ContainerGroup, true),
+		//checkForValidUserAndGroup,
+		//CheckForUserMappings(ContainerGroup, true),
 
 		V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
 			V.MatchesRegex(exposeHostPortRegexp).Negate(),
 			"'{value}' has invalid port format"),
 
 		// Check if pod refers to an existing .pod quadlet
-		V.CheckForInvalidValue(ContainerGroup, KeyPod,
-			V.HasLength().And(V.HasSuffix(".pod").Negate())),
-		CheckForInvalidReference(ContainerGroup, KeyPod),
+		//V.CheckForInvalidValue(ContainerGroup, KeyPod,
+		//	V.HasLength().And(V.HasSuffix(".pod").Negate())),
+		//CheckForInvalidReference(ContainerGroup, KeyPod),
 
 		// Check if volume refers to an existing .volume quadlet
-		CheckForInvalidReferences(ContainerGroup, KeyVolume),
-		CheckForInvalidReferences(ContainerGroup, KeyMount),
+		//CheckForInvalidReferences(ContainerGroup, KeyVolume),
+		//CheckForInvalidReferences(ContainerGroup, KeyMount),
 	)
 }
 

@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/quadlet"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
-
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/quadlet"
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
@@ -104,7 +103,8 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
-		quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
+		quadlet.NewValidator{VName: "new", VContext: validator.Context{AllUnitFiles: unitFiles, Options: validator.Options{CheckReferences: checkReferences}}},
+		//quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
 	}
 
 	for _, file := range unitFiles {
