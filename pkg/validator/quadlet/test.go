@@ -2,12 +2,15 @@ package quadlet
 
 import (
 	"fmt"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
-	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"reflect"
 	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/containers/storage/pkg/regexp"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
 type NewValidator struct {
@@ -42,7 +45,11 @@ func CheckRules(validator V.Validator, unit parser.UnitFile, rules Groups) []V.V
 
 			ruleFns := groupValue.FieldByName(fieldName).Interface().([]Rule)
 			for _, rule := range ruleFns {
-				validationErrors = append(validationErrors, rule(validator, unit, Fields[fieldName])...)
+				field, ok := Fields[fieldName]
+				if !ok {
+					panic(fmt.Sprintf("field %s not found in Fields map", fieldName))
+				}
+				validationErrors = append(validationErrors, rule(validator, unit, field)...)
 			}
 		}
 	}
@@ -66,6 +73,7 @@ func (n NewValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 			),
 			Network: Rules(
 				CanReference(parser.UnitTypeNetwork, parser.UnitTypeContainer),
+				//ValuesMust(HaveNoOptions)
 				//HasFormat(NetworkFormat),
 			),
 			Volume: Rules(CanReference(parser.UnitTypeVolume)),
@@ -78,28 +86,42 @@ func (n NewValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 			RemapUid: Rules(
 				Deprecated, ConflictsWithNewUserMappingKeys,
 				DependsOn(RemapUsers),
-				// TODO: Refactor below to => ValueMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id")),
-				ValueDependsOn(RemapUsers, "keep-id", HasZeroOrOneValue,
+				ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id", "auto"),
 					"RemapUsers=keep-id supports only a single value for UID mapping"),
 			),
 			RemapGid: Rules(
 				Deprecated, ConflictsWithNewUserMappingKeys,
 				DependsOn(RemapUsers),
-				// TODO: Refactor below to => ValueMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id")),
-				ValueDependsOn(RemapUsers, "keep-id", HasZeroOrOneValue,
+				ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id", "auto"),
 					"RemapUsers=keep-id supports only a single value for GID mapping"),
 			),
 			RemapUsers: Rules(
 				Deprecated, ConflictsWithNewUserMappingKeys,
 				AllowedValues("manual", "auto", "keep-id"),
 			),
-			//ExposeHostPort: Rules(ValueMust(MatchRegex(exposeHostPortRegexp))),
+			ExposeHostPort: Rules(ValuesMust(MatchRegexp(exposeHostPortRegexp), Always,
+				fmt.Sprintf("ExposeHostPort invalid port format. must match regexp '%s'", exposeHostPortRegexp))),
 		},
 		Service: Service{
 			KillMode: Rules(AllowedValues("mixed", "control-group")),
 			Type:     Rules(AllowedValues("notify", "oneshot")),
 		},
 	})
+}
+
+func Always(V.Validator, parser.UnitFile, Field) bool {
+	return true
+}
+
+func MatchRegexp(regexp regexp.Regexp) ValuesPredicate {
+	return func(field Field, values []string) bool {
+		for _, value := range values {
+			if !regexp.MatchString(value) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 type Groups struct {
@@ -137,28 +159,49 @@ func (f Field) String() string {
 }
 
 var (
-	Image      = Field{Group: "Container", Key: "Image"}
-	Rootfs     = Field{Group: "Container", Key: "Rootfs"}
-	Network    = Field{Group: "Container", Key: "Network", Multiple: true}
-	User       = Field{Group: "Container", Key: "User"}
-	UserNS     = Field{Group: "Container", Key: "UserNS"}
-	UIDMap     = Field{Group: "Container", Key: "UIDMap", Multiple: true}
-	GIDMap     = Field{Group: "Container", Key: "GIDMap", Multiple: true}
-	SubUIDMap  = Field{Group: "Container", Key: "SubUIDMap"}
-	SubGIDMap  = Field{Group: "Container", Key: "SubGIDMap"}
-	RemapUsers = Field{Group: "Container", Key: "RemapUsers"}
+	// Container Group fields
+	Image          = Field{Group: "Container", Key: "Image"}
+	Rootfs         = Field{Group: "Container", Key: "Rootfs"}
+	Network        = Field{Group: "Container", Key: "Network", Multiple: true}
+	Volume         = Field{Group: "Container", Key: "Volume"}
+	Mount          = Field{Group: "Container", Key: "Mount"}
+	Pod            = Field{Group: "Container", Key: "Pod"}
+	Group          = Field{Group: "Container", Key: "Group"}
+	ExposeHostPort = Field{Group: "Container", Key: "ExposeHostPort"}
+	User           = Field{Group: "Container", Key: "User"}
+	UserNS         = Field{Group: "Container", Key: "UserNS"}
+	UIDMap         = Field{Group: "Container", Key: "UIDMap", Multiple: true}
+	GIDMap         = Field{Group: "Container", Key: "GIDMap", Multiple: true}
+	SubUIDMap      = Field{Group: "Container", Key: "SubUIDMap"}
+	SubGIDMap      = Field{Group: "Container", Key: "SubGIDMap"}
+	RemapUid       = Field{Group: "Container", Key: "RemapUid", Multiple: true}
+	RemapGid       = Field{Group: "Container", Key: "RemapGid", Multiple: true}
+	RemapUsers     = Field{Group: "Container", Key: "RemapUsers"}
+
+	// Service Group fields
+	KillMode = Field{Group: "Container", Key: "KillMode"}
+	Type     = Field{Group: "Container", Key: "Type"}
 
 	Fields = map[string]Field{
-		"Image":      Image,
-		"Rootfs":     Rootfs,
-		"Network":    Network,
-		"User":       User,
-		"UserNS":     UserNS,
-		"UIDMap":     UIDMap,
-		"GIDMap":     GIDMap,
-		"SubUIDMap":  SubUIDMap,
-		"SubGIDMap":  SubGIDMap,
-		"RemapUsers": RemapUsers,
+		"Image":          Image,
+		"Rootfs":         Rootfs,
+		"Network":        Network,
+		"Volume":         Volume,
+		"Mount":          Mount,
+		"Pod":            Pod,
+		"Group":          Group,
+		"ExposeHostPort": ExposeHostPort,
+		"User":           User,
+		"UserNS":         UserNS,
+		"UIDMap":         UIDMap,
+		"GIDMap":         GIDMap,
+		"SubUIDMap":      SubUIDMap,
+		"SubGIDMap":      SubGIDMap,
+		"RemapUid":       RemapUid,
+		"RemapGid":       RemapGid,
+		"RemapUsers":     RemapUsers,
+		"KillMode":       KillMode,
+		"Type":           Type,
 	}
 )
 
@@ -370,6 +413,39 @@ func ValueDependsOn(dependency Field, conditionValue string, valueValidator func
 
 var ConflictsWithNewUserMappingKeys = ConflictsWith(UserNS, UIDMap, GIDMap, SubUIDMap, SubGIDMap)
 
-func HasZeroOrOneValue(values []string) bool {
+func HaveZeroOrOneValues(field Field, values []string) bool {
 	return len(values) <= 1
+}
+
+type ValuePredicate func(field Field, values string) bool
+type ValuesPredicate func(field Field, values []string) bool
+type RulePredicate func(validator V.Validator, unit parser.UnitFile, field Field) bool
+
+func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredicate {
+	return func(validator V.Validator, unit parser.UnitFile, field Field) bool {
+		values := unit.LookupAll(conditionField.Group, conditionField.Key)
+		for _, fieldValue := range values {
+			for _, conditionValue := range conditionValues {
+				if fieldValue == conditionValue {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
+func ValuesMust(valuePredicate ValuesPredicate, rulePredicate RulePredicate, message string) Rule {
+	return func(validator V.Validator, unit parser.UnitFile, field Field) []V.ValidationError {
+		if rulePredicate(validator, unit, field) {
+			// TODO: Should use correct Lookup function depending on the field
+			// Refactor Lookup function to take Field instances
+			// Fields should define LookupMode property that tells which Lookup function to use
+			values := unit.LookupAllStrv(field.Group, field.Key)
+			if !valuePredicate(field, values) {
+				return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0, message)
+			}
+		}
+		return nil
+	}
 }

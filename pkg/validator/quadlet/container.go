@@ -61,9 +61,9 @@ func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 		//checkForValidUserAndGroup,
 		//CheckForUserMappings(ContainerGroup, true),
 
-		V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
-			V.MatchesRegex(exposeHostPortRegexp).Negate(),
-			"'{value}' has invalid port format"),
+		//V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
+		//	V.MatchesRegex(exposeHostPortRegexp).Negate(),
+		//	"'{value}' has invalid port format"),
 
 		// Check if pod refers to an existing .pod quadlet
 		//V.CheckForInvalidValue(ContainerGroup, KeyPod,
