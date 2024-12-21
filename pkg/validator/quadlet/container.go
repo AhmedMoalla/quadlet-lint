@@ -6,6 +6,9 @@ import (
 
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/container"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/service"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
 
@@ -33,7 +36,7 @@ var (
 // V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
 // V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
 func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
-	return CheckRules(c, unit, Groups{
+	return CheckRules(c, unit, model.Groups{
 		Container: Container{
 			Rootfs: Rules(
 				RequiredIfNotPresent(Image),

@@ -9,35 +9,21 @@ import (
 
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model"
 )
 
-// ================== Model ==================
+// ================== Utilities ==================
 
-type Rule = func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError
-
-func Rules(rules ...Rule) []Rule {
+func Rules(rules ...V.Rule) []V.Rule {
 	return rules
 }
-
-// TODO: should be moved to parser implementation
-type Field struct {
-	Group    string
-	Key      string
-	Multiple bool
-}
-
-func (f Field) String() string {
-	return fmt.Sprintf("%s.%s", f.Group, f.Key)
-}
-
-// ================== Utilities ==================
 
 func ErrSlice(validatorName string, errType V.ErrorType, line, column int, message string) []V.ValidationError {
 	return []V.ValidationError{*V.Err(validatorName, errType, line, column, message)}
 }
 
 // TODO: Refactor
-func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.ValidationError {
+func CheckRules(validator V.Validator, unit P.UnitFile, rules M.Groups) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 
 	groupsValue := reflect.ValueOf(rules)
@@ -53,12 +39,13 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.Valida
 
 			fieldName := fieldType.Name
 
-			ruleFns := groupValue.FieldByName(fieldName).Interface().([]Rule)
+			ruleFns := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
 			for _, rule := range ruleFns {
-				field, ok := Fields[fieldName]
+				field, ok := M.Fields[fieldName]
 				if !ok {
 					panic(fmt.Sprintf("field %s not found in Fields map", fieldName))
 				}
+				field.Group = groupField.Name
 				validationErrors = append(validationErrors, rule(validator, unit, field)...)
 			}
 		}
@@ -69,8 +56,8 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.Valida
 
 // ================== Rules ==================
 
-func RequiredIfNotPresent(other Field) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func RequiredIfNotPresent(other P.Field) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		if !unit.HasValue(other.Group, other.Key) && !unit.HasValue(field.Group, field.Key) {
 			return ErrSlice(validator.Name(), V.RequiredKey, 0, 0,
 				fmt.Sprintf("at least one of these keys is required: %s, %s", field, other))
@@ -80,8 +67,8 @@ func RequiredIfNotPresent(other Field) Rule {
 	}
 }
 
-func ConflictsWith(others ...Field) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func ConflictsWith(others ...P.Field) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, other := range others {
 			if unit.HasValue(other.Group, other.Key) && unit.HasValue(field.Group, field.Key) {
@@ -94,8 +81,8 @@ func ConflictsWith(others ...Field) Rule {
 	}
 }
 
-func CanReference(unitTypes ...P.UnitType) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func CanReference(unitTypes ...P.UnitType) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		context := validator.Context()
 		if !context.CheckReferences {
 			return nil
@@ -136,7 +123,7 @@ func CanReference(unitTypes ...P.UnitType) Rule {
 }
 
 func HaveFormat(format Format) ValuesValidator {
-	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
+	return func(validator V.Validator, field P.Field, values []string) *V.ValidationError {
 		for _, value := range values {
 			err := format.ParseAndValidate(value)
 			if err != nil {
@@ -148,8 +135,8 @@ func HaveFormat(format Format) ValuesValidator {
 	}
 }
 
-func AllowedValues(allowedValues ...string) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func AllowedValues(allowedValues ...string) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		value, ok := unit.Lookup(field.Group, field.Key)
 		if ok && !slices.Contains(allowedValues, value) {
 			return ErrSlice(validator.Name(), V.InvalidValue, 0, 0,
@@ -160,8 +147,8 @@ func AllowedValues(allowedValues ...string) Rule {
 	}
 }
 
-func HasSuffix(suffix string) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func HasSuffix(suffix string) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		value, found := unit.Lookup(field.Group, field.Key)
 		if !found {
 			return nil
@@ -176,8 +163,8 @@ func HasSuffix(suffix string) Rule {
 	}
 }
 
-func DependsOn(dependency Field) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func DependsOn(dependency P.Field) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		dependency, dependencyFound := unit.Lookup(dependency.Group, dependency.Key)
 		dependencyOk := dependencyFound && len(dependency) > 0
 
@@ -194,7 +181,7 @@ func DependsOn(dependency Field) Rule {
 	}
 }
 
-func Deprecated(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func Deprecated(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 	if _, found := unit.Lookup(field.Group, field.Key); found {
 		return ErrSlice(validator.Name(), V.DeprecatedKey, 0, 0,
 			fmt.Sprintf("key '%s' is deprecated and should not be used", field))
@@ -203,8 +190,8 @@ func Deprecated(validator V.Validator, unit P.UnitFile, field Field) []V.Validat
 	return nil
 }
 
-func ValuesMust(valuePredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func ValuesMust(valuePredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
 		if rulePredicate(validator, unit, field) {
 			// TODO: Should use correct Lookup function depending on the field
 			// Refactor Lookup function to take Field instances
@@ -238,10 +225,10 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 
 // ================== ValuesValidators ==================
 
-type ValuesValidator func(validator V.Validator, field Field, values []string) *V.ValidationError
-type RulePredicate func(validator V.Validator, unit P.UnitFile, field Field) bool
+type ValuesValidator func(validator V.Validator, field P.Field, values []string) *V.ValidationError
+type RulePredicate func(validator V.Validator, unit P.UnitFile, field P.Field) bool
 
-func HaveZeroOrOneValues(validator V.Validator, field Field, values []string) *V.ValidationError {
+func HaveZeroOrOneValues(validator V.Validator, field P.Field, values []string) *V.ValidationError {
 	if len(values) > 1 {
 		return V.Err(validator.Name(), V.InvalidValue, 0, 0, "should have exactly zero or one value")
 	}
@@ -249,8 +236,8 @@ func HaveZeroOrOneValues(validator V.Validator, field Field, values []string) *V
 	return nil
 }
 
-func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredicate {
-	return func(validator V.Validator, unit P.UnitFile, field Field) bool {
+func WhenFieldEquals(conditionField P.Field, conditionValues ...string) RulePredicate {
+	return func(validator V.Validator, unit P.UnitFile, field P.Field) bool {
 		values := unit.LookupAll(conditionField.Group, conditionField.Key)
 		for _, fieldValue := range values {
 			for _, conditionValue := range conditionValues {
@@ -263,12 +250,12 @@ func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredic
 	}
 }
 
-func Always(V.Validator, P.UnitFile, Field) bool {
+func Always(V.Validator, P.UnitFile, P.Field) bool {
 	return true
 }
 
 func MatchRegexp(regexp regexp.Regexp) ValuesValidator {
-	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
+	return func(validator V.Validator, field P.Field, values []string) *V.ValidationError {
 		for _, value := range values {
 			if !regexp.MatchString(value) {
 				return V.Err(validator.Name(), V.InvalidValue, 0, 0,

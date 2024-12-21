@@ -6,6 +6,8 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 )
 
+type Rule = func(validator Validator, unit parser.UnitFile, field parser.Field) []ValidationError
+
 type Validator interface {
 	Name() string
 	Context() Context

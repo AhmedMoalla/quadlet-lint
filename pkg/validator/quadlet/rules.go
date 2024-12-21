@@ -8,6 +8,7 @@ import (
 
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	C "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/container"
 	R "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
 
@@ -26,10 +27,10 @@ var NetworkFormat = R.Format{
 
 // ================== Rules ==================
 
-var ConflictsWithNewUserMappingKeys = R.ConflictsWith(R.UserNS, R.UIDMap, R.GIDMap, R.SubUIDMap, R.SubGIDMap)
+var ConflictsWithNewUserMappingKeys = R.ConflictsWith(C.UserNS, C.UIDMap, C.GIDMap, C.SubUIDMap, C.SubGIDMap)
 
-func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field R.Field) []V.ValidationError {
-	imageName, ok := unit.Lookup(field.Group, R.Image.Key)
+func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
+	imageName, ok := unit.Lookup(field.Group, C.Image.Key)
 	if !ok {
 		return nil
 	}
