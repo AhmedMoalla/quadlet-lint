@@ -52,7 +52,7 @@ func checkIfQuadletReferenceExists(validator V.Validator, quadletName string) []
 			})
 
 			if !foundUnit {
-				return V.ErrorAsSlice(validator.Name(), InvalidReference, 0, 0,
+				return V.ErrSlice(validator.Name(), InvalidReference, 0, 0,
 					fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType, quadletName))
 			}
 		}
@@ -68,7 +68,7 @@ func CheckForUserMappings(groupName string, supportManual bool) V.CheckerFn {
 			_, hasRemapGID := unit.Lookup(groupName, KeyRemapGid)
 			_, RemapUsers := unit.LookupLast(groupName, KeyRemapUsers)
 			if hasRemapUID || hasRemapGID || RemapUsers {
-				return V.ErrorAsSlice(validator.Name(), V.DeprecatedKey, 0, 0,
+				return V.ErrSlice(validator.Name(), V.DeprecatedKey, 0, 0,
 					"deprecated Remap keys are set along with explicit mapping keys")
 			}
 			return nil
@@ -109,34 +109,34 @@ func checkIfUserRemapsValid(validator V.Validator, unitFile parser.UnitFile, gro
 	switch remapUsers {
 	case "":
 		if len(uidMaps) > 0 {
-			return V.ErrorAsSlice(validator.Name(), V.RequiredKey, 0, 0,
+			return V.ErrSlice(validator.Name(), V.RequiredKey, 0, 0,
 				"UidMap set without RemapUsers")
 		}
 		if len(gidMaps) > 0 {
-			return V.ErrorAsSlice(validator.Name(), V.RequiredKey, 0, 0,
+			return V.ErrSlice(validator.Name(), V.RequiredKey, 0, 0,
 				"GidMap set without RemapUsers")
 		}
 	case "manual":
 		if !supportManual {
-			return V.ErrorAsSlice(validator.Name(), V.InvalidValue, 0, 0,
+			return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0,
 				"RemapUsers=manual is not supported")
 		}
 	case "auto":
 	case "keep-id":
 		if len(uidMaps) > 0 {
 			if len(uidMaps) > 1 {
-				return V.ErrorAsSlice(validator.Name(), V.InvalidValue, 0, 0,
+				return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0,
 					"RemapUsers=keep-id supports only a single value for UID mapping")
 			}
 		}
 		if len(gidMaps) > 0 {
 			if len(gidMaps) > 1 {
-				return V.ErrorAsSlice(validator.Name(), V.InvalidValue, 0, 0,
+				return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0,
 					"RemapUsers=keep-id supports only a single value for GID mapping")
 			}
 		}
 	default:
-		return V.ErrorAsSlice(validator.Name(), V.InvalidValue, 0, 0,
+		return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0,
 			fmt.Sprintf("unsupported RemapUsers option '%s'", remapUsers))
 	}
 
@@ -159,7 +159,7 @@ func CheckForAmbiguousImageName(group string) V.CheckerFn {
 			message := fmt.Sprintf("%s specifies the image \"%s\" which not a fully qualified image name. "+
 				"This is not ideal for performance and security reasons. "+
 				"See the podman-pull manpage discussion of short-name-aliases.conf for details.", unit.Filename, imageName)
-			return V.ErrorAsSlice(validator.Name(), AmbiguousImageName, 0, 0, message)
+			return V.ErrSlice(validator.Name(), AmbiguousImageName, 0, 0, message)
 		}
 
 		return nil

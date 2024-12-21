@@ -49,8 +49,8 @@ func (p *Predicate) And(other *Predicate) *Predicate {
 	}
 }
 
-func ErrorAsSlice(validatorName string, errType ErrorType, line, column int, message string) []ValidationError {
-	return []ValidationError{Error(validatorName, errType, line, column, message)}
+func ErrSlice(validatorName string, errType ErrorType, line, column int, message string) []ValidationError {
+	return []ValidationError{Err(validatorName, errType, line, column, message)}
 }
 
 func DoChecks(validator Validator, unit parser.UnitFile, checkers ...CheckerFn) []ValidationError {
@@ -72,7 +72,7 @@ func CheckForRequiredKey(groupName string, requiredKeyCandidates ...string) Chec
 				return nil
 			}
 		}
-		return ErrorAsSlice(validator.Name(), RequiredKey, 0, 0,
+		return ErrSlice(validator.Name(), RequiredKey, 0, 0,
 			fmt.Sprintf("at least one of these keys is required: %s", requiredKeyCandidates))
 	}
 }
@@ -91,7 +91,7 @@ func CheckForKeyConflict(groupName string, conflictingKeys ...string) CheckerFn 
 			return nil
 		}
 
-		return ErrorAsSlice(validator.Name(), KeyConflict, 0, 0,
+		return ErrSlice(validator.Name(), KeyConflict, 0, 0,
 			fmt.Sprintf("the keys %s cannot be specified together", keysFound))
 	}
 }
@@ -101,7 +101,7 @@ func CheckForAllowedValues(groupName string, key string, allowedValues ...string
 		fmt.Println("CheckForAllowedValues:", unit.Filename, groupName, key, allowedValues)
 		value, ok := unit.Lookup(groupName, key)
 		if ok && !slices.Contains(allowedValues, value) {
-			return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0,
+			return ErrSlice(validator.Name(), InvalidValue, 0, 0,
 				fmt.Sprintf("invalid value '%s' for key '[%s]%s'. Allowed values: %s",
 					value, groupName, key, allowedValues))
 		}
@@ -115,7 +115,7 @@ func CheckForUnknownKeys(groupName string, supportedKeys map[string]bool) Checke
 		keys := unit.ListKeys(groupName)
 		for _, key := range keys {
 			if !supportedKeys[key] {
-				return ErrorAsSlice(validator.Name(), UnknownKey, 0, 0,
+				return ErrSlice(validator.Name(), UnknownKey, 0, 0,
 					fmt.Sprintf("unsupported key '%s' in group '%s' in %s", key, groupName, unit.Path))
 			}
 		}
@@ -148,7 +148,7 @@ func checkForInvalidValues(groupName string, key string, predicate *Predicate, m
 			value := strings.TrimSpace(value)
 			if predicate.fn(value) {
 				// TODO: Make CheckerFn return list of ValidationErrors and return all of them here
-				return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0, message(value))
+				return ErrSlice(validator.Name(), InvalidValue, 0, 0, message(value))
 			}
 		}
 		return nil
@@ -172,7 +172,7 @@ func checkForInvalidValue(groupName string, key string, predicate *Predicate, me
 		fmt.Println("checkForInvalidValue:", unit.Filename, groupName, key)
 		value, ok := unit.Lookup(groupName, key)
 		if ok && predicate.fn(value) {
-			return ErrorAsSlice(validator.Name(), InvalidValue, 0, 0, message(value))
+			return ErrSlice(validator.Name(), InvalidValue, 0, 0, message(value))
 		}
 		return nil
 	}

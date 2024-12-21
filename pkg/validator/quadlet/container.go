@@ -23,7 +23,13 @@ func (c containerValidator) Context() V.Context {
 	return c.context
 }
 
+var (
+	exposeHostPortRegexp = regexp.Delayed(`\d+(-\d+)?(/udp|/tcp)?$`)
+)
+
 // TODO:
+// - Add format checks for every key
+// - Implement spec
 // - Add logging to display in debug mode
 // - Add source of the rule in the specification
 // - Add line and column numbers on the parser's level -> Each entry should have a line associated with it and the starting column of the value
@@ -61,7 +67,7 @@ func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 		CheckForUserMappings(ContainerGroup, true),
 
 		V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
-			V.MatchesRegex(regexp.Delayed(`\d+(-\d+)?(/udp|/tcp)?$`)).Negate(),
+			V.MatchesRegex(exposeHostPortRegexp).Negate(),
 			"'{value}' has invalid port format"),
 
 		// Check if pod refers to an existing .pod quadlet
@@ -72,8 +78,6 @@ func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 		// Check if volume refers to an existing .volume quadlet
 		CheckForInvalidReferences(ContainerGroup, KeyVolume),
 		CheckForInvalidReferences(ContainerGroup, KeyMount),
-
-		// TODO: Check for Mount see: pkg/systemd/quadlet/quadlet.go:2064
 	)
 }
 
@@ -86,7 +90,7 @@ func checkForValidUserAndGroup(validator V.Validator, unit parser.UnitFile) []V.
 	okGroup := hasGroup && len(group) > 0
 
 	if !okUser && okGroup {
-		return V.ErrorAsSlice(validator.Name(), V.InvalidValue, 0, 0, "invalid Group set without User")
+		return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0, "invalid Group set without User")
 	}
 
 	return nil

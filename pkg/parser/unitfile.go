@@ -698,3 +698,8 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 	}
 	return res
 }
+
+func (f *UnitFile) HasValue(groupName string, key string) bool {
+	value, found := f.Lookup(groupName, key)
+	return found && len(value) > 0
+}
