@@ -50,7 +50,7 @@ func (p *Predicate) And(other *Predicate) *Predicate {
 }
 
 func ErrSlice(validatorName string, errType ErrorType, line, column int, message string) []ValidationError {
-	return []ValidationError{Err(validatorName, errType, line, column, message)}
+	return []ValidationError{*Err(validatorName, errType, line, column, message)}
 }
 
 func DoChecks(validator Validator, unit parser.UnitFile, checkers ...CheckerFn) []ValidationError {

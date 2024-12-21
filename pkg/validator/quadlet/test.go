@@ -1,6 +1,7 @@
 package quadlet
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -57,6 +58,83 @@ func CheckRules(validator V.Validator, unit parser.UnitFile, rules Groups) []V.V
 	return validationErrors
 }
 
+// Format is the format that a value of a given key has
+// For example: the Network key has the format: mode[:options,...] so the Format would be:
+// - ValueSeparator: ":"
+// - OptionsSeparator: ","
+type Format struct {
+	Name             string // Name of the Format
+	ValueSeparator   string // ValueSeparator is the separator between the value and its options
+	OptionsSeparator string // OptionsSeparator is the separator between the options
+
+	Value string // Value is the value before the ValueSeparator. Populated after calling ParseAndValidate.
+	// Options are the options after the ValueSeparator split by the OptionsSeparator.
+	// Populated after calling ParseAndValidate.
+	Options map[string]string
+
+	ValidateOptions func(value string, options map[string]string) error
+}
+
+func (f *Format) ParseAndValidate(value string) error {
+	split := strings.Split(value, f.ValueSeparator)
+	if len(split) == 0 || len(split) > 2 {
+		return errors.New(
+			fmt.Sprintf("'%s' does not match the '%s' format because it is expected to have 2 parts after "+
+				"splitting the value with '%s' but got instead %d parts", value, f.Name, f.ValueSeparator, len(split)))
+	}
+
+	f.Value = split[0]
+
+	if len(split) == 1 { // no options
+		return nil
+	}
+
+	split = strings.Split(split[1], f.OptionsSeparator)
+	options := make(map[string]string, len(split))
+	for _, pair := range split {
+		kv := strings.Split(pair, "=")
+		options[kv[0]] = kv[1]
+	}
+	f.Options = options
+
+	if f.ValidateOptions != nil {
+		if err := f.ValidateOptions(f.Value, f.Options); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+var NetworkFormat = Format{
+	Name: "Network", ValueSeparator: ":", OptionsSeparator: ",",
+	ValidateOptions: func(value string, options map[string]string) error {
+		if strings.HasSuffix(value, ".container") && len(options) > 0 { // TODO: Add extension as field to UnitType and refer to this as `UnitTypeContainer.Ext`
+			return errors.New(fmt.Sprintf("'%s' is invalid because extra options are not supported when "+
+				"joining another container's network", value))
+		}
+		return nil
+	},
+}
+
+func HaveFormat(format Format) ValuesValidator {
+	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
+		for _, value := range values {
+			err := format.ParseAndValidate(value)
+			if err != nil {
+				return V.Err(validator.Name(), V.InvalidValue, 0, 0, err.Error())
+			}
+		}
+
+		return nil
+	}
+}
+
+// TODO: Implement all these checks in the parser
+// TODO: All present values should not be empty
+// Check if we have keys that are not listed in the spec
+// V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
+// V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
 func (n NewValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 	return CheckRules(n, unit, Groups{
 		Container: Container{
@@ -73,8 +151,8 @@ func (n NewValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 			),
 			Network: Rules(
 				CanReference(parser.UnitTypeNetwork, parser.UnitTypeContainer),
-				//ValuesMust(HaveNoOptions)
-				//HasFormat(NetworkFormat),
+				ValuesMust(MatchRegexp(networkRegexp), Always, "Network value has an invalid format."),
+				ValuesMust(HaveFormat(NetworkFormat), Always),
 			),
 			Volume: Rules(CanReference(parser.UnitTypeVolume)),
 			Mount:  Rules(CanReference(parser.UnitTypeVolume)),
@@ -100,7 +178,7 @@ func (n NewValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 				AllowedValues("manual", "auto", "keep-id"),
 			),
 			ExposeHostPort: Rules(ValuesMust(MatchRegexp(exposeHostPortRegexp), Always,
-				fmt.Sprintf("ExposeHostPort invalid port format. must match regexp '%s'", exposeHostPortRegexp))),
+				fmt.Sprintf("ExposeHostPort invalid port format. Must match regexp '%s'", exposeHostPortRegexp))),
 		},
 		Service: Service{
 			KillMode: Rules(AllowedValues("mixed", "control-group")),
@@ -113,14 +191,15 @@ func Always(V.Validator, parser.UnitFile, Field) bool {
 	return true
 }
 
-func MatchRegexp(regexp regexp.Regexp) ValuesPredicate {
-	return func(field Field, values []string) bool {
+func MatchRegexp(regexp regexp.Regexp) ValuesValidator {
+	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
 		for _, value := range values {
 			if !regexp.MatchString(value) {
-				return false
+				return V.Err(validator.Name(), V.InvalidValue, 0, 0,
+					fmt.Sprintf("Must match regexp '%s'", regexp))
 			}
 		}
-		return true
+		return nil
 	}
 }
 
@@ -227,7 +306,7 @@ func ConflictsWith(others ...Field) Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, other := range others {
 			if unit.HasValue(other.Group, other.Key) && unit.HasValue(field.Group, field.Key) {
-				validationErrors = append(validationErrors, V.Err(validator.Name(), V.KeyConflict, 0, 0,
+				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.KeyConflict, 0, 0,
 					fmt.Sprintf("the keys %s, %s cannot be specified together", field, other)))
 			}
 		}
@@ -264,7 +343,7 @@ func CanReference(unitTypes ...parser.UnitType) Rule {
 					})
 
 					if !foundUnit {
-						validationErrors = append(validationErrors, V.Err(validator.Name(), InvalidReference, 0, 0,
+						validationErrors = append(validationErrors, *V.Err(validator.Name(), InvalidReference, 0, 0,
 							fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType, value)))
 					}
 				}
@@ -413,12 +492,15 @@ func ValueDependsOn(dependency Field, conditionValue string, valueValidator func
 
 var ConflictsWithNewUserMappingKeys = ConflictsWith(UserNS, UIDMap, GIDMap, SubUIDMap, SubGIDMap)
 
-func HaveZeroOrOneValues(field Field, values []string) bool {
-	return len(values) <= 1
+func HaveZeroOrOneValues(validator V.Validator, field Field, values []string) *V.ValidationError {
+	if len(values) > 1 {
+		return V.Err(validator.Name(), V.InvalidValue, 0, 0, "should have exactly zero or one value")
+	}
+
+	return nil
 }
 
-type ValuePredicate func(field Field, values string) bool
-type ValuesPredicate func(field Field, values []string) bool
+type ValuesValidator func(validator V.Validator, field Field, values []string) *V.ValidationError
 type RulePredicate func(validator V.Validator, unit parser.UnitFile, field Field) bool
 
 func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredicate {
@@ -435,17 +517,35 @@ func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredic
 	}
 }
 
-func ValuesMust(valuePredicate ValuesPredicate, rulePredicate RulePredicate, message string) Rule {
+func ValuesMust(valuePredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) Rule {
 	return func(validator V.Validator, unit parser.UnitFile, field Field) []V.ValidationError {
 		if rulePredicate(validator, unit, field) {
 			// TODO: Should use correct Lookup function depending on the field
 			// Refactor Lookup function to take Field instances
 			// Fields should define LookupMode property that tells which Lookup function to use
 			values := unit.LookupAllStrv(field.Group, field.Key)
-			if !valuePredicate(field, values) {
-				return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0, message)
+			if err := valuePredicate(validator, field, values); err != nil {
+				errorMsg := buildErrorMessage(messageAndArgs, err)
+				return V.ErrSlice(validator.Name(), V.InvalidValue, 0, 0, errorMsg)
 			}
 		}
 		return nil
 	}
+}
+
+func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
+	var errorMsg string
+	if len(messageAndArgs) == 1 {
+		errorMsg = messageAndArgs[0].(string)
+	} else if len(messageAndArgs) > 1 {
+		errorMsg = fmt.Sprintf(messageAndArgs[0].(string), messageAndArgs[1:]...)
+	}
+
+	if len(errorMsg) > 0 {
+		errorMsg = fmt.Sprintf("%s. %s", errorMsg, err)
+	} else if len(errorMsg) == 0 {
+		errorMsg = err.Error()
+	}
+
+	return errorMsg
 }

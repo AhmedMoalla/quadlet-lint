@@ -2,8 +2,6 @@ package quadlet
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/containers/storage/pkg/regexp"
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
@@ -25,55 +23,50 @@ func (c containerValidator) Context() V.Context {
 
 var (
 	exposeHostPortRegexp = regexp.Delayed(`\d+(-\d+)?(/udp|/tcp)?$`)
+	networkRegexp        = regexp.Delayed(`^[^:]+(:(?:\w+=[^,]+,?)+$)*`)
 )
 
 func (c containerValidator) Validate(unit parser.UnitFile) []V.ValidationError {
-	return V.DoChecks(c, unit,
-		//CheckForAmbiguousImageName(ContainerGroup),
+	return V.DoChecks(c, unit) //CheckForAmbiguousImageName(ContainerGroup),
 
-		// TODO: All present values should not be empty
-		// Check if we have keys that are not listed in the spec
-		V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
-		V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
+	// One image or rootfs must be specified for the container
+	//V.CheckForRequiredKey(ContainerGroup, KeyImage, KeyRootfs),
+	//V.CheckForKeyConflict(ContainerGroup, KeyImage, KeyRootfs),
 
-		// One image or rootfs must be specified for the container
-		//V.CheckForRequiredKey(ContainerGroup, KeyImage, KeyRootfs),
-		//V.CheckForKeyConflict(ContainerGroup, KeyImage, KeyRootfs),
+	// Check if image refers to an existing .image or .build quadlet
+	//CheckForInvalidReference(ContainerGroup, KeyImage),
+	//CheckForInvalidReference(ContainerGroup, KeyRootfs),
 
-		// Check if image refers to an existing .image or .build quadlet
-		//CheckForInvalidReference(ContainerGroup, KeyImage),
-		//CheckForInvalidReference(ContainerGroup, KeyRootfs),
+	// Only allow mixed or control-group, as nothing else works well
+	//V.CheckForAllowedValues(ServiceGroup, KeyKillMode, "mixed", "control-group"),
 
-		// Only allow mixed or control-group, as nothing else works well
-		//V.CheckForAllowedValues(ServiceGroup, KeyKillMode, "mixed", "control-group"),
+	// When referring to a .container quadlet options are not supported
+	//V.CheckForInvalidValuesWithPredicateFn(ContainerGroup, KeyNetwork, func(network string) bool {
+	//	networkName, _, found := strings.Cut(network, ":")
+	//	return found && strings.HasSuffix(networkName, ".container")
+	//}, "'{value}' is invalid because extra options are not supported when joining another container's network"),
 
-		// When referring to a .container quadlet options are not supported
-		V.CheckForInvalidValuesWithPredicateFn(ContainerGroup, KeyNetwork, func(network string) bool {
-			networkName, _, found := strings.Cut(network, ":")
-			return found && strings.HasSuffix(networkName, ".container")
-		}, "'{value}' is invalid because extra options are not supported when joining another container's network"),
+	// Check if network refers to an existing .network or .container
+	//CheckForInvalidReferences(ContainerGroup, KeyNetwork),
 
-		// Check if network refers to an existing .network or .container
-		//CheckForInvalidReferences(ContainerGroup, KeyNetwork),
+	//V.CheckForAllowedValues(ServiceGroup, KeyType, "notify", "oneshot"),
 
-		//V.CheckForAllowedValues(ServiceGroup, KeyType, "notify", "oneshot"),
+	//checkForValidUserAndGroup,
+	//CheckForUserMappings(ContainerGroup, true),
 
-		//checkForValidUserAndGroup,
-		//CheckForUserMappings(ContainerGroup, true),
+	//V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
+	//	V.MatchesRegex(exposeHostPortRegexp).Negate(),
+	//	"'{value}' has invalid port format"),
 
-		//V.CheckForInvalidValuesWithMessage(ContainerGroup, KeyExposeHostPort,
-		//	V.MatchesRegex(exposeHostPortRegexp).Negate(),
-		//	"'{value}' has invalid port format"),
+	// Check if pod refers to an existing .pod quadlet
+	//V.CheckForInvalidValue(ContainerGroup, KeyPod,
+	//	V.HasLength().And(V.HasSuffix(".pod").Negate())),
+	//CheckForInvalidReference(ContainerGroup, KeyPod),
 
-		// Check if pod refers to an existing .pod quadlet
-		//V.CheckForInvalidValue(ContainerGroup, KeyPod,
-		//	V.HasLength().And(V.HasSuffix(".pod").Negate())),
-		//CheckForInvalidReference(ContainerGroup, KeyPod),
+	// Check if volume refers to an existing .volume quadlet
+	//CheckForInvalidReferences(ContainerGroup, KeyVolume),
+	//CheckForInvalidReferences(ContainerGroup, KeyMount),
 
-		// Check if volume refers to an existing .volume quadlet
-		//CheckForInvalidReferences(ContainerGroup, KeyVolume),
-		//CheckForInvalidReferences(ContainerGroup, KeyMount),
-	)
 }
 
 func checkForValidUserAndGroup(validator V.Validator, unit parser.UnitFile) []V.ValidationError {

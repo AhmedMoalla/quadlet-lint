@@ -37,8 +37,8 @@ type ValidationError struct {
 	ValidatorName string
 }
 
-func Err(validatorName string, errType ErrorType, line, column int, message string) ValidationError {
-	return ValidationError{
+func Err(validatorName string, errType ErrorType, line, column int, message string) *ValidationError {
+	return &ValidationError{
 		ErrorType:     errType,
 		Location:      Location{Line: line, Column: column},
 		Message:       message,

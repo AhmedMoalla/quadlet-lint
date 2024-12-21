@@ -94,7 +94,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 		}
 
 		for _, err := range errs {
-			errors.AddError(path, validator.Err("", ParsingError, err.Line, err.Column, err.Error()))
+			errors.AddError(path, *validator.Err("", ParsingError, err.Line, err.Column, err.Error()))
 		}
 	}
 	return unitFiles, errors
