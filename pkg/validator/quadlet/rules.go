@@ -6,9 +6,9 @@ import (
 	"strings"
 	"unicode"
 
+	C "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/container"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
-	C "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/container"
 	R "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
 

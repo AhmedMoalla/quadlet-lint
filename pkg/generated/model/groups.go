@@ -1,9 +1,9 @@
 package model
 
 import (
+	"github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/container"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/container"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/service"
 )
 
 type Groups struct {

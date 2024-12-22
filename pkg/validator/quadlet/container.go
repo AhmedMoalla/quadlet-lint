@@ -2,13 +2,13 @@ package quadlet
 
 import (
 	"fmt"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
 	"regexp"
 
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/container"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model"
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/container"
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/generated/model/service"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
 
