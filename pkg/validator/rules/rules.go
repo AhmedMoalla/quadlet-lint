@@ -2,12 +2,12 @@ package rules
 
 import (
 	"fmt"
-	M "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
 	"reflect"
 	"regexp"
 	"slices"
 	"strings"
 
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
