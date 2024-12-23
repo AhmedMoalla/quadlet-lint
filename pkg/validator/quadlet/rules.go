@@ -30,10 +30,11 @@ var NetworkFormat = R.Format{
 var ConflictsWithNewUserMappingKeys = R.ConflictsWith(C.UserNS, C.UIDMap, C.GIDMap, C.SubUIDMap, C.SubGIDMap)
 
 func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field P.Field) []V.ValidationError {
-	imageName, ok := unit.Lookup(field.Group, C.Image.Key)
+	value, ok := unit.Lookup(field.Group, C.Image.Key)
 	if !ok {
 		return nil
 	}
+	imageName := value.Value
 
 	if strings.HasSuffix(imageName, ".build") || strings.HasSuffix(imageName, ".image") {
 		return nil
@@ -43,7 +44,7 @@ func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field P.Field) []
 		message := fmt.Sprintf("%s specifies the image \"%s\" which not a fully qualified image name. "+
 			"This is not ideal for performance and security reasons. "+
 			"See the podman-pull manpage discussion of short-name-aliases.conf for details.", unit.Filename, imageName)
-		return R.ErrSlice(validator.Name(), AmbiguousImageName, 0, 0, message)
+		return R.ErrSlice(validator.Name(), AmbiguousImageName, value.Line, value.Column, message)
 	}
 
 	return nil

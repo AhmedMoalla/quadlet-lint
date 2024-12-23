@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/user"
 	"path"
 	"strconv"
 	"strings"
@@ -13,7 +12,17 @@ import (
 
 type unitLine struct {
 	key   string
-	value string
+	value UnitValue
+}
+
+type UnitValue struct {
+	Value  string
+	Line   int
+	Column int
+}
+
+func (u *UnitValue) String() string {
+	return u.Value
 }
 
 type unitGroup struct {
@@ -38,7 +47,6 @@ type UnitFile struct {
 	groupByName map[string]*unitGroup
 
 	Filename string
-	Path     string
 	UnitType UnitType
 }
 
@@ -76,7 +84,7 @@ func (e *ParsingError) Error() string {
 	return fmt.Sprintf("%s", e.message)
 }
 
-func newUnitLine(key string, value string) *unitLine {
+func newUnitLine(key string, value UnitValue) *unitLine {
 	l := &unitLine{
 		key:   key,
 		value: value,
@@ -89,7 +97,7 @@ func (l *unitLine) isKey(key string) bool {
 }
 
 func (l *unitLine) isEmpty() bool {
-	return len(l.value) == 0
+	return len(l.value.Value) == 0
 }
 
 func newUnitGroup(name string) *unitGroup {
@@ -109,7 +117,7 @@ func (g *unitGroup) prependLine(line *unitLine) {
 	g.lines = append(n, g.lines...)
 }
 
-func (g *unitGroup) add(key string, value string) {
+func (g *unitGroup) add(key string, value UnitValue) {
 	g.addLine(newUnitLine(key, value))
 }
 
@@ -142,7 +150,6 @@ func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 	}
 
 	f := NewUnitFile()
-	f.Path = pathName
 	f.Filename = path.Base(pathName)
 	f.UnitType = UnitType(path.Ext(pathName)[1:])
 
@@ -288,7 +295,11 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 
 	value := line[valueStart:]
 
-	p.currentGroup.add(key, value)
+	p.currentGroup.add(key, UnitValue{
+		Value:  value,
+		Line:   p.lineNr,
+		Column: valueStart,
+	})
 
 	return nil
 }
@@ -420,15 +431,15 @@ func (f *UnitFile) ListKeys(groupName string) []string {
 // Look up the last instance of the named key in the group (if any)
 // The result can have trailing whitespace, and Raw means it can
 // contain line continuations (\ at end of line)
-func (f *UnitFile) LookupLastRaw(groupName string, key string) (string, bool) {
+func (f *UnitFile) LookupLastRaw(groupName string, key string) (UnitValue, bool) {
 	g, ok := f.groupByName[groupName]
 	if !ok {
-		return "", false
+		return UnitValue{}, false
 	}
 
 	line := g.findLast(key)
 	if line == nil {
-		return "", false
+		return UnitValue{}, false
 	}
 
 	return line.value, true
@@ -441,24 +452,27 @@ func (f *UnitFile) HasKey(groupName string, key string) bool {
 
 // Look up the last instance of the named key in the group (if any)
 // The result can have trailing whitespace, but line continuations are applied
-func (f *UnitFile) LookupLast(groupName string, key string) (string, bool) {
+func (f *UnitFile) LookupLast(groupName string, key string) (UnitValue, bool) {
 	raw, ok := f.LookupLastRaw(groupName, key)
 	if !ok {
-		return "", false
+		return UnitValue{}, false
 	}
 
-	return applyLineContinuation(raw), true
+	raw.Value = applyLineContinuation(raw.Value)
+	return raw, true
 }
 
 // Look up the last instance of the named key in the group (if any)
 // The result have no trailing whitespace and line continuations are applied
-func (f *UnitFile) Lookup(groupName string, key string) (string, bool) {
+func (f *UnitFile) Lookup(groupName string, key string) (UnitValue, bool) {
 	v, ok := f.LookupLast(groupName, key)
 	if !ok {
-		return "", false
+		return UnitValue{}, false
 	}
 
-	return strings.Trim(strings.TrimRightFunc(v, unicode.IsSpace), "\""), true
+	v.Value = strings.Trim(strings.TrimRightFunc(v.Value, unicode.IsSpace), "\"")
+
+	return v, true
 }
 
 // Lookup the last instance of a key and convert the value to a bool
@@ -468,10 +482,11 @@ func (f *UnitFile) LookupBoolean(groupName string, key string) (bool, bool) {
 		return false, false
 	}
 
-	return strings.EqualFold(v, "1") ||
-		strings.EqualFold(v, "yes") ||
-		strings.EqualFold(v, "true") ||
-		strings.EqualFold(v, "on"), true
+	value := v.Value
+	return strings.EqualFold(value, "1") ||
+		strings.EqualFold(value, "yes") ||
+		strings.EqualFold(value, "true") ||
+		strings.EqualFold(value, "on"), true
 }
 
 // Lookup the last instance of a key and convert the value to a bool
@@ -517,7 +532,7 @@ func (f *UnitFile) LookupInt(groupName string, key string, defaultValue int64) i
 		return defaultValue
 	}
 
-	intVal, err := convertNumber(v)
+	intVal, err := convertNumber(v.Value)
 
 	if err != nil {
 		return defaultValue
@@ -535,88 +550,22 @@ func (f *UnitFile) LookupUint32(groupName string, key string, defaultValue uint3
 	return uint32(v)
 }
 
-// Lookup the last instance of a key and convert a uid or a user name to an uint32 uid
-func (f *UnitFile) LookupUID(groupName string, key string, defaultValue uint32) (uint32, error) {
-	v, ok := f.Lookup(groupName, key)
-	if !ok {
-		if defaultValue == math.MaxUint32 {
-			return 0, fmt.Errorf("no key %s", key)
-		}
-		return defaultValue, nil
-	}
-
-	intVal, err := convertNumber(v)
-	if err == nil {
-		/* On linux, uids are uint32 values, that can't be (uint32)-1 (== MAXUINT32)*/
-		if intVal < 0 || intVal >= math.MaxUint32 {
-			return 0, fmt.Errorf("invalid numerical uid '%s'", v)
-		}
-
-		return uint32(intVal), nil
-	}
-
-	user, err := user.Lookup(v)
-	if err != nil {
-		return 0, err
-	}
-
-	intVal, err = strconv.ParseInt(user.Uid, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint32(intVal), nil
-}
-
-// Lookup the last instance of a key and convert a uid or a group name to an uint32 gid
-func (f *UnitFile) LookupGID(groupName string, key string, defaultValue uint32) (uint32, error) {
-	v, ok := f.Lookup(groupName, key)
-	if !ok {
-		if defaultValue == math.MaxUint32 {
-			return 0, fmt.Errorf("no key %s", key)
-		}
-		return defaultValue, nil
-	}
-
-	intVal, err := convertNumber(v)
-	if err == nil {
-		/* On linux, uids are uint32 values, that can't be (uint32)-1 (== MAXUINT32)*/
-		if intVal < 0 || intVal >= math.MaxUint32 {
-			return 0, fmt.Errorf("invalid numerical uid '%s'", v)
-		}
-
-		return uint32(intVal), nil
-	}
-
-	group, err := user.LookupGroup(v)
-	if err != nil {
-		return 0, err
-	}
-
-	intVal, err = strconv.ParseInt(group.Gid, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint32(intVal), nil
-}
-
 // Look up every instance of the named key in the group
 // The result can have trailing whitespace, and Raw means it can
 // contain line continuations (\ at end of line)
-func (f *UnitFile) LookupAllRaw(groupName string, key string) []string {
+func (f *UnitFile) LookupAllRaw(groupName string, key string) []UnitValue {
 	g, ok := f.groupByName[groupName]
 	if !ok {
-		return make([]string, 0)
+		return make([]UnitValue, 0)
 	}
 
-	values := make([]string, 0)
+	values := make([]UnitValue, 0)
 
 	for _, line := range g.lines {
 		if line.isKey(key) {
-			if len(line.value) == 0 {
+			if len(line.value.Value) == 0 {
 				// Empty value clears all before
-				values = make([]string, 0)
+				values = make([]UnitValue, 0)
 			} else {
 				values = append(values, line.value)
 			}
@@ -628,10 +577,10 @@ func (f *UnitFile) LookupAllRaw(groupName string, key string) []string {
 
 // Look up every instance of the named key in the group
 // The result can have trailing whitespace, but line continuations are applied
-func (f *UnitFile) LookupAll(groupName string, key string) []string {
+func (f *UnitFile) LookupAll(groupName string, key string) []UnitValue {
 	values := f.LookupAllRaw(groupName, key)
 	for i, raw := range values {
-		values[i] = applyLineContinuation(raw)
+		values[i].Value = applyLineContinuation(raw.Value)
 	}
 	return values
 }
@@ -644,7 +593,7 @@ func (f *UnitFile) LookupAllStrv(groupName string, key string) []string {
 	res := make([]string, 0)
 	values := f.LookupAll(groupName, key)
 	for _, value := range values {
-		res, _ = splitStringAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
+		res, _ = splitStringAppend(res, value.Value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
 	}
 	return res
 }
@@ -657,7 +606,7 @@ func (f *UnitFile) LookupAllArgs(groupName string, key string) []string {
 	res := make([]string, 0)
 	argsv := f.LookupAll(groupName, key)
 	for _, argsS := range argsv {
-		args, err := splitString(argsS, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		args, err := splitString(argsS.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			res = append(res, args...)
 		}
@@ -673,7 +622,7 @@ func (f *UnitFile) LookupAllArgs(groupName string, key string) []string {
 func (f *UnitFile) LookupLastArgs(groupName string, key string) ([]string, bool) {
 	execKey, ok := f.LookupLast(groupName, key)
 	if ok {
-		execArgs, err := splitString(execKey, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		execArgs, err := splitString(execKey.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			return execArgs, true
 		}
@@ -686,7 +635,7 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 	res := make(map[string]string)
 	allKeyvals := f.LookupAll(groupName, key)
 	for _, keyvals := range allKeyvals {
-		assigns, err := splitString(keyvals, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		assigns, err := splitString(keyvals.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			for _, assign := range assigns {
 				key, value, found := strings.Cut(assign, "=")
@@ -701,5 +650,5 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 
 func (f *UnitFile) HasValue(groupName string, key string) bool {
 	value, found := f.Lookup(groupName, key)
-	return found && len(value) > 0
+	return found && len(value.Value) > 0
 }
