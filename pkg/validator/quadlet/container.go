@@ -2,9 +2,9 @@ package quadlet
 
 import (
 	"fmt"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
 	"regexp"
 
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/container"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
@@ -36,7 +36,7 @@ var (
 // V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
 // V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
 func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
-	return CheckRules(c, unit, model.Groups{
+	return CheckRules(c, unit, Groups{
 		Container: GContainer{
 			Rootfs: Rules(
 				RequiredIfNotPresent(Image),

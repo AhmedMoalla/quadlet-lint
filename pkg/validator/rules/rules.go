@@ -260,7 +260,7 @@ func MatchRegexp(regexp regexp.Regexp) ValuesValidator {
 		for _, value := range values {
 			if !regexp.MatchString(value) {
 				return V.Err(validator.Name(), V.InvalidValue, 0, 0,
-					fmt.Sprintf("Must match regexp '%s'", regexp))
+					fmt.Sprintf("Must match regexp '%s'", regexp.String()))
 			}
 		}
 		return nil

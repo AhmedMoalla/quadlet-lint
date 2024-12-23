@@ -1,3 +1,4 @@
 .idea
+bin
 generated
 !generated/generated.go

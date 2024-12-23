@@ -2,8 +2,11 @@
 
 .PHONY:build
 
-build:
+generate:
 	go generate ./...
 	go fmt ./...
+
+build: generate
 	go vet ./...
-	go build
+	mkdir -p bin
+	go build -o bin ./...
