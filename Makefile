@@ -1,10 +1,13 @@
 .DEFAULT_GOAL := build
 
-.PHONY:build
+.PHONY: fmt generate build
 
-generate:
-	go generate ./...
+fmt:
 	go fmt ./...
+	go run golang.org/x/tools/cmd/goimports@latest -local 'github.com/AhmedMoalla/quadlet-lint' -w .
+
+generate: fmt
+	go generate ./...
 
 build: generate
 	go vet ./...

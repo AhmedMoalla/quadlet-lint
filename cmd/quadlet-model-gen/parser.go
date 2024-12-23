@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/AhmedMoalla/quadlet-lint/pkg/generated"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"strings"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/generated"
 )
 
 var groupByKeyMap = map[string]string{
