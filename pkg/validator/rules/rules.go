@@ -32,6 +32,7 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules M.Groups) []V.Vali
 	for groupIndex := range groupsType.NumField() {
 		groupField := groupsType.Field(groupIndex)
 		groupValue := groupsValue.Field(groupIndex)
+		groupName := groupField.Name
 
 		groupType := groupField.Type
 		for fieldIndex := range groupType.NumField() {
@@ -41,7 +42,7 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules M.Groups) []V.Vali
 
 			ruleFns := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
 			for _, rule := range ruleFns {
-				field, ok := M.Fields[fieldName]
+				field, ok := M.Fields[groupName][fieldName]
 				if !ok {
 					panic(fmt.Sprintf("field %s not found in Fields map", fieldName))
 				}
@@ -228,7 +229,7 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 type ValuesValidator func(validator V.Validator, field P.Field, values []string) *V.ValidationError
 type RulePredicate func(validator V.Validator, unit P.UnitFile, field P.Field) bool
 
-func HaveZeroOrOneValues(validator V.Validator, field P.Field, values []string) *V.ValidationError {
+func HaveZeroOrOneValues(validator V.Validator, _ P.Field, values []string) *V.ValidationError {
 	if len(values) > 1 {
 		return V.Err(validator.Name(), V.InvalidValue, 0, 0, "should have exactly zero or one value")
 	}
@@ -250,7 +251,7 @@ func WhenFieldEquals(conditionField P.Field, conditionValues ...string) RulePred
 	}
 }
 
-func Always(V.Validator, P.UnitFile, P.Field) bool {
+func Always(_ V.Validator, _ P.UnitFile, _ P.Field) bool {
 	return true
 }
 

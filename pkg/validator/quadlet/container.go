@@ -37,7 +37,7 @@ var (
 // V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
 func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 	return CheckRules(c, unit, model.Groups{
-		Container: Container{
+		Container: GContainer{
 			Rootfs: Rules(
 				RequiredIfNotPresent(Image),
 				ConflictsWith(Image),
@@ -80,7 +80,7 @@ func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 			ExposeHostPort: Rules(ValuesMust(MatchRegexp(*exposeHostPortRegexp), Always,
 				fmt.Sprintf("ExposeHostPort invalid port format. Must match regexp '%s'", exposeHostPortRegexp))),
 		},
-		Service: Service{
+		Service: GService{
 			KillMode: Rules(AllowedValues("mixed", "control-group")),
 			Type:     Rules(AllowedValues("notify", "oneshot")),
 		},

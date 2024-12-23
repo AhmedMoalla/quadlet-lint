@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/AhmedMoalla/quadlet-lint/pkg/generated"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -65,6 +66,13 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 			}
 		}
 	}
+
+	for group := range groups {
+		if fields, ok := generated.AdditionalFields[group]; ok {
+			groups[group] = append(groups[group], fields...)
+		}
+	}
+
 	return quadletSourceFileData{fieldsByGroup: groups}, nil
 }
 
