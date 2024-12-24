@@ -3,10 +3,11 @@ package validator
 import (
 	"fmt"
 
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 )
 
-type Rule = func(validator Validator, unit parser.UnitFile, field parser.Field) []ValidationError
+type Rule = func(validator Validator, unit parser.UnitFile, field model.Field) []ValidationError
 
 type Validator interface {
 	Name() string

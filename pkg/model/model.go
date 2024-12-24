@@ -1,6 +1,8 @@
-package parser
+package model
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Field struct {
 	Group    string

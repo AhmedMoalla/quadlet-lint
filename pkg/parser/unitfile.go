@@ -295,6 +295,10 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 
 	value := line[valueStart:]
 
+	if len(value) == 0 {
+		return newParsingError(p.lineNr, valueStart, fmt.Sprintf("key '%s' has an empty value", key))
+	}
+
 	p.currentGroup.add(key, UnitValue{
 		Value:  value,
 		Line:   p.lineNr,

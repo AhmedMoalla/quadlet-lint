@@ -37,28 +37,28 @@ type quadletValidator struct {
 	validators map[parser.UnitType]validator.Validator
 }
 
-func (q quadletValidator) Name() string {
-	return q.name
+func (v quadletValidator) Name() string {
+	return v.name
 }
 
-func (q quadletValidator) Context() validator.Context {
-	return q.context
+func (v quadletValidator) Context() validator.Context {
+	return v.context
 }
 
-func (q quadletValidator) Validate(unit parser.UnitFile) []validator.ValidationError {
-	return q.validators[unit.UnitType].Validate(unit)
+func (v quadletValidator) Validate(unit parser.UnitFile) []validator.ValidationError {
+	return v.validators[unit.UnitType].Validate(unit)
 }
 
 type noOpValidator struct{}
 
-func (n noOpValidator) Name() string {
+func (v noOpValidator) Name() string {
 	return "noop"
 }
 
-func (n noOpValidator) Context() validator.Context {
+func (v noOpValidator) Context() validator.Context {
 	return validator.Context{}
 }
 
-func (n noOpValidator) Validate(parser.UnitFile) []validator.ValidationError {
+func (v noOpValidator) Validate(parser.UnitFile) []validator.ValidationError {
 	return []validator.ValidationError{}
 }

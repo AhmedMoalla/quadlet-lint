@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/common"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -97,6 +98,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
+		common.Validator(),
 		quadlet.Validator(unitFiles, validator.Options{CheckReferences: checkReferences}),
 	}
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"regexp"
 
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/container"
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model/service"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
+	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
@@ -17,12 +17,12 @@ type containerValidator struct {
 	context V.Context
 }
 
-func (c containerValidator) Name() string {
-	return c.name
+func (v containerValidator) Name() string {
+	return v.name
 }
 
-func (c containerValidator) Context() V.Context {
-	return c.context
+func (v containerValidator) Context() V.Context {
+	return v.context
 }
 
 var (
@@ -30,13 +30,8 @@ var (
 	networkRegexp        = regexp.MustCompile(`^[^:]+(:(?:\w+=[^,]+,?)+$)*`)
 )
 
-// TODO: Implement all these checks in the parser
-// TODO: All present values should not be empty
-// Check if we have keys that are not listed in the spec
-// V.CheckForUnknownKeys(ContainerGroup, supportedContainerKeys),
-// V.CheckForUnknownKeys(QuadletGroup, supportedQuadletKeys),
-func (c containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
-	return CheckRules(c, unit, Groups{
+func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
+	return CheckRules(v, unit, Groups{
 		Container: GContainer{
 			Rootfs: Rules(
 				RequiredIfNotPresent(Image),

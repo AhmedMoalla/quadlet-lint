@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AhmedMoalla/quadlet-lint/pkg/generated"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
 
 var groupByKeyMap = map[string]string{
@@ -69,7 +69,7 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 	}
 
 	for group := range groups {
-		if fields, ok := generated.AdditionalFields[group]; ok {
+		if fields, ok := model.AdditionalFields[group]; ok {
 			groups[group] = append(groups[group], fields...)
 		}
 	}

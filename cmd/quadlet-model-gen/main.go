@@ -12,7 +12,7 @@ const (
 	podmanVersionFlag    = "podman-version"
 	podmanVersionEnvKey  = "PODMAN_VERSION"
 	quadletFileLocation  = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/quadlet/quadlet.go"
-	baseModelPackageName = "github.com/AhmedMoalla/quadlet-lint/pkg/generated/model"
+	baseModelPackageName = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 )
 
 var (

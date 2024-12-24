@@ -15,13 +15,13 @@ func generateSourceFiles(data quadletSourceFileData) error {
 		panic(err)
 	}
 
-	modelDir := filepath.Join(workingDir, "model")
-	err = os.Mkdir(modelDir, 0777)
+	outputDir := filepath.Join(workingDir, "generated")
+	err = os.Mkdir(outputDir, 0777)
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
 
-	err = generateFile(modelDir, data.fieldsByGroup, "groups.go", groupsFile)
+	err = generateFile(outputDir, data.fieldsByGroup, "groups.go", groupsFile)
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func generateSourceFiles(data quadletSourceFileData) error {
 	for group := range data.fieldsByGroup {
 		groupLower := strings.ToLower(group)
 		path := fmt.Sprintf("%s/%s.go", groupLower, groupLower)
-		err = generateFile(modelDir, data.fieldsByGroup, path, groupFile(group))
+		err = generateFile(outputDir, data.fieldsByGroup, path, groupFile(group))
 		if err != nil {
 			return err
 		}
@@ -40,9 +40,9 @@ func generateSourceFiles(data quadletSourceFileData) error {
 
 type FileGenerator = func(*bytes.Buffer, map[string][]string)
 
-func generateFile(modelDir string, fieldsByGroup map[string][]string, filename string, generateFileContent FileGenerator) error {
+func generateFile(outputDir string, fieldsByGroup map[string][]string, filename string, generateFileContent FileGenerator) error {
 	dir, filename := filepath.Split(filename)
-	fileDir := filepath.Join(modelDir, dir)
+	fileDir := filepath.Join(outputDir, dir)
 	if len(dir) > 0 {
 		err := os.MkdirAll(fileDir, 0777)
 		if err != nil && !os.IsExist(err) {
@@ -79,7 +79,7 @@ func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]string) {
 	for group := range fieldsByGroup {
 		b.WriteString(fmt.Sprintf("\t\"%s/%s\"\n", baseModelPackageName, strings.ToLower(group)))
 	}
-	b.WriteString("\tP \"github.com/AhmedMoalla/quadlet-lint/pkg/parser\"\n")
+	b.WriteString("\tM \"github.com/AhmedMoalla/quadlet-lint/pkg/model\"\n")
 	b.WriteString(")\n\n")
 
 	b.WriteString("type Groups struct {\n")
@@ -88,7 +88,7 @@ func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]string) {
 	}
 	b.WriteString("}\n\n")
 
-	b.WriteString("var Fields =  map[string]map[string]P.Field{\n")
+	b.WriteString("var Fields =  map[string]map[string]M.Field{\n")
 	for group, fields := range fieldsByGroup {
 		b.WriteString(fmt.Sprintf("\t\"%s\": {\n", group))
 		for _, field := range fields {
@@ -104,7 +104,7 @@ func groupFile(group string) FileGenerator {
 		b.WriteString(fmt.Sprintf("package %s\n\n", strings.ToLower(group)))
 		if len(fieldsByGroup[group]) > 0 {
 			b.WriteString("import (\n")
-			b.WriteString("\tP \"github.com/AhmedMoalla/quadlet-lint/pkg/parser\"\n")
+			b.WriteString("\tM \"github.com/AhmedMoalla/quadlet-lint/pkg/model\"\n")
 			b.WriteString("\tV \"github.com/AhmedMoalla/quadlet-lint/pkg/validator\"\n")
 			b.WriteString(")\n\n")
 		}
@@ -117,7 +117,7 @@ func groupFile(group string) FileGenerator {
 
 		b.WriteString("var (\n")
 		for _, field := range fieldsByGroup[group] {
-			b.WriteString(fmt.Sprintf("\t%s = P.Field{Group: \"%s\", Key: \"%s\"}\n", field, group, field))
+			b.WriteString(fmt.Sprintf("\t%s = M.Field{Group: \"%s\", Key: \"%s\"}\n", field, group, field))
 		}
 		b.WriteString(")\n")
 	}
