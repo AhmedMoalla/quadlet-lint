@@ -30,16 +30,19 @@ type unitGroup struct {
 	lines []*unitLine
 }
 
-type UnitType string
+type UnitType struct {
+	Name string
+	Ext  string
+}
 
 var (
-	UnitTypeContainer UnitType = "container"
-	UnitTypeVolume    UnitType = "volume"
-	UnitTypeKube      UnitType = "kube"
-	UnitTypeNetwork   UnitType = "network"
-	UnitTypeImage     UnitType = "image"
-	UnitTypeBuild     UnitType = "build"
-	UnitTypePod       UnitType = "pod"
+	UnitTypeContainer = UnitType{Name: "container", Ext: ".container"}
+	UnitTypeVolume    = UnitType{Name: "volume", Ext: ".volume"}
+	UnitTypeKube      = UnitType{Name: "kube", Ext: ".kube"}
+	UnitTypeNetwork   = UnitType{Name: "network", Ext: ".network"}
+	UnitTypeImage     = UnitType{Name: "image", Ext: ".image"}
+	UnitTypeBuild     = UnitType{Name: "build", Ext: ".build"}
+	UnitTypePod       = UnitType{Name: "pod", Ext: ".pod"}
 )
 
 type UnitFile struct {
@@ -151,7 +154,8 @@ func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 
 	f := NewUnitFile()
 	f.Filename = path.Base(pathName)
-	f.UnitType = UnitType(path.Ext(pathName)[1:])
+	ext := path.Ext(pathName)
+	f.UnitType = UnitType{Name: ext[1:], Ext: ext}
 
 	parsingErrors := f.Parse(string(data))
 	if len(parsingErrors) > 0 {

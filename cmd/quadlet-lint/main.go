@@ -146,7 +146,13 @@ func isDir(path string) bool {
 }
 
 var supportedExtensions = []string{
-	".container", ".volume", ".kube", ".network", ".image", ".build", ".pod",
+	parser.UnitTypeContainer.Ext,
+	parser.UnitTypeVolume.Ext,
+	parser.UnitTypeKube.Ext,
+	parser.UnitTypeNetwork.Ext,
+	parser.UnitTypeImage.Ext,
+	parser.UnitTypeBuild.Ext,
+	parser.UnitTypePod.Ext,
 }
 
 func getAllUnitFiles(rootDirectory string) []string {

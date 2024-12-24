@@ -107,7 +107,7 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range values {
 			for _, unitType := range unitTypes {
-				if strings.HasSuffix(value.Value, string("."+unitType)) { // TODO: Add extension as field to UnitType
+				if strings.HasSuffix(value.Value, unitType.Ext) {
 					foundUnit := slices.ContainsFunc(units, func(unit P.UnitFile) bool {
 						return unit.Filename == value.Value
 					})

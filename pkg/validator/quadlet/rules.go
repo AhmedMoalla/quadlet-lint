@@ -18,7 +18,7 @@ import (
 var NetworkFormat = R.Format{
 	Name: "Network", ValueSeparator: ":", OptionsSeparator: ",",
 	ValidateOptions: func(value string, options map[string]string) error {
-		if strings.HasSuffix(value, ".container") && len(options) > 0 { // TODO: Add extension as field to UnitType and refer to this as `UnitTypeContainer.Ext`
+		if strings.HasSuffix(value, P.UnitTypeContainer.Ext) && len(options) > 0 {
 			return errors.New(fmt.Sprintf("'%s' is invalid because extra options are not supported when "+
 				"joining another container's network", value))
 		}
@@ -41,7 +41,7 @@ func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field M.Field) []
 	}
 	imageName := value.Value
 
-	if strings.HasSuffix(imageName, ".build") || strings.HasSuffix(imageName, ".image") {
+	if strings.HasSuffix(imageName, P.UnitTypeBuild.Ext) || strings.HasSuffix(imageName, P.UnitTypeImage.Ext) {
 		return nil
 	}
 

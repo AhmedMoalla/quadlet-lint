@@ -52,7 +52,7 @@ func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 			Volume: Rules(CanReference(P.UnitTypeVolume)),
 			Mount:  Rules(CanReference(P.UnitTypeVolume)),
 			Pod: Rules(
-				HasSuffix(".pod"), // TODO: Add extension as field to UnitType and refer to this as `UnitTypePod.Ext`
+				HasSuffix(P.UnitTypePod.Ext),
 				CanReference(P.UnitTypePod),
 			),
 			Group: Rules(DependsOn(User)),
