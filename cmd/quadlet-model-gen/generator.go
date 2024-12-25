@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
 
 func generateSourceFiles(data quadletSourceFileData) error {
@@ -116,8 +118,18 @@ func groupFile(group string) FileGenerator {
 		b.WriteString("}\n\n")
 
 		b.WriteString("var (\n")
-		for _, field := range fieldsByGroup[group] {
-			b.WriteString(fmt.Sprintf("\t%s = M.Field{Group: \"%s\", Key: \"%s\"}\n", field, group, field))
+		for _, fieldName := range fieldsByGroup[group] {
+			field := model.Field{
+				Group: group,
+				Key:   fieldName,
+			}
+
+			if meta, ok := model.FieldsMetadata[group][fieldName]; ok {
+				field.Multiple = meta.Multiple
+			}
+
+			fieldStr := strings.Replace(fmt.Sprintf("%#v", field), "model.", "M.", 1)
+			b.WriteString(fmt.Sprintf("\t%s = %s\n", fieldName, fieldStr))
 		}
 		b.WriteString(")\n")
 	}

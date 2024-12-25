@@ -19,7 +19,6 @@ var (
 	podmanVersion = flag.String(podmanVersionFlag, "", "Podman's tag used to download the source file for code generation")
 )
 
-// TODO: gofmt generated files
 // Download the quadlet.go file from given podman tag version
 //
 //	Use: https://raw.githubusercontent.com/containers/podman/refs/tags/v5.3.1/pkg/systemd/quadlet/quadlet.go

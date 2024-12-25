@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/common"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/common"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/quadlet"
 )
 
