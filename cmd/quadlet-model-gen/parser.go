@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -21,6 +22,16 @@ var groupByKeyMap = map[string]string{
 	"supportedQuadletKeys":   "Quadlet",
 }
 
+var lookupFunctions = map[model.LookupMode]bool{
+	model.LookupModeBase:    true,
+	model.LookupModeLast:    true,
+	model.LookupModeLastRaw: true,
+	model.LookupModeAll:     true,
+	model.LookupModeAllRaw:  true,
+	model.LookupModeAllStrv: true,
+	model.LookupModeAllArgs: true,
+}
+
 type quadletSourceFileData struct {
 	fieldsByGroup map[string][]string
 }
@@ -31,6 +42,19 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 	if err != nil {
 		return quadletSourceFileData{}, err
 	}
+
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		if callExpr, ok := n.(*ast.CallExpr); ok {
+			// Get the function name
+			switch fun := callExpr.Fun.(type) {
+			case *ast.SelectorExpr: // Method call (e.g., pkg.Func)
+				if x, ok := fun.X.(*ast.Ident); ok && lookupFunctions[model.LookupMode(fun.Sel.Name)] {
+					fmt.Printf("Method call: %s.%s %#v\n", x.Name, fun.Sel.Name, callExpr.Args)
+				}
+			}
+		}
+		return true
+	})
 
 	groups := make(map[string][]string, 11) // The number of groups declared in the file
 	keyNameByKeyVarName := make(map[string]string, 50)
