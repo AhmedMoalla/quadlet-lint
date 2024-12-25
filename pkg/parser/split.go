@@ -407,8 +407,9 @@ finishForceNext:
 	return s.String(), in[p:], true, nil
 }
 
-func splitStringAppend(appendTo []string, s string, separators string, flags SplitFlags) ([]string, error) {
+func splitStringAppend(appendTo []UnitValue, u UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
 	orig := appendTo
+	s := u.Value
 	for {
 		word, remaining, moreWords, err := extractFirstWord(s, separators, flags)
 		if err != nil {
@@ -418,14 +419,18 @@ func splitStringAppend(appendTo []string, s string, separators string, flags Spl
 		if !moreWords {
 			break
 		}
-		appendTo = append(appendTo, word)
+		appendTo = append(appendTo, UnitValue{
+			Value:  word,
+			Line:   u.Line,
+			Column: u.Column, // TODO: Not Correct, should be offset
+		})
 		s = remaining
 	}
 	return appendTo, nil
 }
 
-func splitString(s string, separators string, flags SplitFlags) ([]string, error) {
-	return splitStringAppend(make([]string, 0), s, separators, flags)
+func splitString(s UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
+	return splitStringAppend(make([]UnitValue, 0), s, separators, flags)
 }
 
 func charNeedEscape(c rune, isPath bool) bool {

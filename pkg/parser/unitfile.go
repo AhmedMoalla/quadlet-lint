@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
 
 type unitLine struct {
@@ -51,6 +53,70 @@ type UnitFile struct {
 
 	Filename string
 	UnitType UnitType
+}
+
+type LookupResult struct {
+	values []UnitValue
+}
+
+func (r *LookupResult) Value() *UnitValue {
+	if len(r.values) == 0 {
+		return nil
+	}
+
+	if len(r.values) != 1 {
+		panic("lookup result has more than one value")
+	}
+
+	return &r.values[0]
+}
+
+func (r *LookupResult) Values() []UnitValue {
+	return r.values
+}
+
+func singleResult(value UnitValue) LookupResult {
+	return LookupResult{values: []UnitValue{value}}
+}
+
+func multiResult(values []UnitValue) (LookupResult, bool) {
+	return LookupResult{values: values}, len(values) > 0
+}
+
+func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
+	key := field.Key
+	group := field.Group
+	if field.Multiple {
+		var vals []UnitValue
+		switch field.LookupMode {
+		case model.LookupModeAll:
+			vals = f.LookupAll(group, key)
+		case model.LookupModeAllRaw:
+			vals = f.LookupAllRaw(group, key)
+		case model.LookupModeAllStrv:
+			vals = f.LookupAllStrv(group, key)
+		case model.LookupModeAllArgs:
+			vals = f.LookupAllArgs(group, key)
+		default:
+			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
+				field.LookupMode, field.Key))
+		}
+		return multiResult(vals)
+	} else {
+		var val UnitValue
+		var ok bool
+		switch field.LookupMode {
+		case model.LookupModeBase:
+			val, ok = f.Lookup(group, key)
+		case model.LookupModeLast:
+			val, ok = f.LookupLast(group, key)
+		case model.LookupModeLastRaw:
+			val, ok = f.LookupLastRaw(group, key)
+		default:
+			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupMode, field.Key))
+		}
+		return singleResult(val), ok
+	}
 }
 
 type UnitFileParser struct {
@@ -597,11 +663,11 @@ func (f *UnitFile) LookupAll(groupName string, key string) []UnitValue {
 // separated words (including handling quoted words) and combine them all into
 // one array of words. The split code is compatible with the systemd config_parse_strv().
 // This is typically used by systemd keys like "RequiredBy" and "Aliases".
-func (f *UnitFile) LookupAllStrv(groupName string, key string) []string {
-	res := make([]string, 0)
+func (f *UnitFile) LookupAllStrv(groupName string, key string) []UnitValue {
 	values := f.LookupAll(groupName, key)
+	res := make([]UnitValue, len(values))
 	for _, value := range values {
-		res, _ = splitStringAppend(res, value.Value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
+		res, _ = splitStringAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
 	}
 	return res
 }
@@ -610,11 +676,11 @@ func (f *UnitFile) LookupAllStrv(groupName string, key string) []string {
 // separated words (including handling quoted words) and combine them all into
 // one array of words. The split code is exec-like, and both unquotes and applied
 // c-style c escapes.
-func (f *UnitFile) LookupAllArgs(groupName string, key string) []string {
-	res := make([]string, 0)
+func (f *UnitFile) LookupAllArgs(groupName string, key string) []UnitValue {
+	res := make([]UnitValue, 0)
 	argsv := f.LookupAll(groupName, key)
 	for _, argsS := range argsv {
-		args, err := splitString(argsS.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		args, err := splitString(argsS, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			res = append(res, args...)
 		}
@@ -627,10 +693,10 @@ func (f *UnitFile) LookupAllArgs(groupName string, key string) []string {
 // array of words. The split code is exec-like, and both unquotes and
 // applied c-style c escapes.  This is typically used for keys like
 // ExecStart
-func (f *UnitFile) LookupLastArgs(groupName string, key string) ([]string, bool) {
+func (f *UnitFile) LookupLastArgs(groupName string, key string) ([]UnitValue, bool) {
 	execKey, ok := f.LookupLast(groupName, key)
 	if ok {
-		execArgs, err := splitString(execKey.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		execArgs, err := splitString(execKey, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			return execArgs, true
 		}
@@ -643,10 +709,10 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 	res := make(map[string]string)
 	allKeyvals := f.LookupAll(groupName, key)
 	for _, keyvals := range allKeyvals {
-		assigns, err := splitString(keyvals.Value, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
+		assigns, err := splitString(keyvals, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			for _, assign := range assigns {
-				key, value, found := strings.Cut(assign, "=")
+				key, value, found := strings.Cut(assign.Value, "=")
 				if found {
 					res[key] = value
 				}
