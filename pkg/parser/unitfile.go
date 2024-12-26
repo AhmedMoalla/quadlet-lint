@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/lookup"
 )
 
 type unitLine struct {
@@ -89,13 +90,13 @@ func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 	if field.Multiple() {
 		var vals []UnitValue
 		switch field.LookupFunc {
-		case model.LookupAll:
+		case lookup.LookupAll:
 			vals = f.LookupAll(group, key)
-		case model.LookupAllRaw:
+		case lookup.LookupAllRaw:
 			vals = f.LookupAllRaw(group, key)
-		case model.LookupAllStrv:
+		case lookup.LookupAllStrv:
 			vals = f.LookupAllStrv(group, key)
-		case model.LookupAllArgs:
+		case lookup.LookupAllArgs:
 			vals = f.LookupAllArgs(group, key)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
@@ -106,11 +107,11 @@ func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 		var val UnitValue
 		var ok bool
 		switch field.LookupFunc {
-		case model.Lookup:
+		case lookup.Lookup:
 			val, ok = f.Lookup(group, key)
-		case model.LookupLast:
+		case lookup.LookupLast:
 			val, ok = f.LookupLast(group, key)
-		case model.LookupLastRaw:
+		case lookup.LookupLastRaw:
 			val, ok = f.LookupLastRaw(group, key)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc, field.Key))

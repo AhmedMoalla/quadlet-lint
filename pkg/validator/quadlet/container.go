@@ -46,7 +46,7 @@ func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 			),
 			Network: Rules(
 				CanReference(P.UnitTypeNetwork, P.UnitTypeContainer),
-				ValuesMust(MatchRegexp(*networkRegexp), Always, "Network value has an invalid format."),
+				ValuesMust(MatchRegexp(*networkRegexp), Always, "Network value has an invalid format"),
 				ValuesMust(HaveFormat(NetworkFormat), Always),
 			),
 			Volume: Rules(CanReference(P.UnitTypeVolume)),

@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	podmanVersionFlag    = "podman-version"
-	podmanVersionEnvKey  = "PODMAN_VERSION"
-	quadletFileLocation  = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/quadlet/quadlet.go"
-	baseModelPackageName = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	podmanVersionFlag          = "podman-version"
+	podmanVersionEnvKey        = "PODMAN_VERSION"
+	quadletFileLocation        = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/quadlet/quadlet.go"
+	unitfileParserFileLocation = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/parser/unitfile.go"
+	baseModelPackageName       = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 )
 
 var (
@@ -23,17 +24,29 @@ func main() {
 	flag.Parse()
 
 	podmanVersion := getPodmanVersion(*podmanVersion)
-	quadletSourceFile, err := downloadQuadletSourceFileFromGithub(podmanVersion)
+	unitfileParserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, podmanVersion)
 	if err != nil {
-		exit(fmt.Errorf("could not download quadlet quadletSourceFile: %s", err))
+		exit(fmt.Errorf("could not download unitfile.go source file: %s", err))
+	}
+	defer os.Remove(unitfileParserFile.Name())
+
+	lookupFuncs, err := parseUnitFileParserSourceFile(unitfileParserFile)
+	if err != nil {
+		exit(fmt.Errorf("could not parse unitfile parser source file: %s", err))
+	}
+
+	quadletSourceFile, err := downloadSourceFileFromGithub(quadletFileLocation, podmanVersion)
+	if err != nil {
+		exit(fmt.Errorf("could not download quadlet.go source file: %s", err))
 	}
 	defer os.Remove(quadletSourceFile.Name())
 
-	data, err := parseQuadletSourceFile(quadletSourceFile)
+	fieldsByGroup, err := parseQuadletSourceFile(quadletSourceFile, lookupFuncs)
 	if err != nil {
 		exit(fmt.Errorf("could not parse quadlet source file: %s", err))
 	}
 
+	data := sourceFileData{fieldsByGroup: fieldsByGroup, lookupFuncs: lookupFuncs}
 	err = generateSourceFiles(data)
 	if err != nil {
 		exit(fmt.Errorf("could not generate source files: %s", err))
@@ -59,13 +72,13 @@ func getPodmanVersion(version string) string {
 	return version
 }
 
-func downloadQuadletSourceFileFromGithub(version string) (*os.File, error) {
+func downloadSourceFileFromGithub(location string, version string) (*os.File, error) {
 	if version == "" {
 		return nil, fmt.Errorf("podman version was not provided. "+
 			"Use -%s flag or %s environment variable", podmanVersionFlag, podmanVersionEnvKey)
 	}
 
-	url := fmt.Sprintf(quadletFileLocation, version)
+	url := fmt.Sprintf(location, version)
 	client := http.Client{}
 	response, err := client.Get(url)
 	if err != nil {

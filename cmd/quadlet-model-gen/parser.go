@@ -6,8 +6,6 @@ import (
 	"go/token"
 	"os"
 	"strings"
-
-	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
 
 var groupByKeyMap = map[string]string{
@@ -27,29 +25,64 @@ var alternativeLookupMethods = map[string]string{
 	"lookupAndAddBoolean":    "LookupBoolean",
 }
 
-type quadletSourceFileData struct {
-	fieldsByGroup map[string][]model.Field
+type sourceFileData struct {
+	fieldsByGroup map[string][]field
+	lookupFuncs   map[string]lookupFunc
 }
 
-// TODO: Generate Field instances for keys used as string literals like Service.KillMode
-// - Extract all Lookup function calls from the quadlet.go file
-// - Get all the calls where the key parameter (second arg) is a string literal
-// - For every call extract the group and key and add it as a field for the group
-// - If the call is a LookupFunc that is flagged as multiple, then the field should be flagged as multiple too
-// TODO: Generate LookupFunc instances
-// - Extract all method declarations of UnitFile that start with 'Lookup' from the unitfile.go file
-// - For every function found, generate a LookupFunc instance
-// - If the function's return type is a []string, then it should be flagged as multiple
-// TODO: Write tests for generated code
-func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
+type field struct {
+	Group      string
+	Key        string
+	LookupFunc lookupFunc
+}
+
+type lookupFunc struct {
+	Name     string
+	Multiple bool
+}
+
+func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error) {
+	fset := token.NewFileSet()
+	parsed, err := parser.ParseFile(fset, file.Name(), nil, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+
+	lookupFuncs := make(map[string]lookupFunc, 15)
+	for _, decl := range parsed.Decls {
+		decl, ok := decl.(*ast.FuncDecl)
+		if !ok || !strings.HasPrefix(decl.Name.Name, "Lookup") {
+			continue
+		}
+
+		var multiple bool
+		for _, field := range decl.Type.Results.List {
+			if _, ok := field.Type.(*ast.ArrayType); ok {
+				multiple = true
+			} else if _, ok := field.Type.(*ast.MapType); ok {
+				multiple = true
+			}
+		}
+
+		lookupFuncs[decl.Name.Name] = lookupFunc{
+			Name:     decl.Name.Name,
+			Multiple: multiple,
+		}
+	}
+
+	return lookupFuncs, nil
+}
+
+// TODO: This is bad. Refactor.
+func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
 	fset := token.NewFileSet()
 	parsed, err := parser.ParseFile(fset, file.Name(), nil, parser.SkipObjectResolution)
 	if err != nil {
-		return quadletSourceFileData{}, err
+		return nil, err
 	}
 
 	constants := make(map[string]string, 150)
-	groups := make(map[string][]model.Field, 11) // The number of groups declared in the file
+	groups := make(map[string][]field, 11) // The number of groups declared in the file
 	groupNameByGroupVarName := make(map[string]string, len(groups))
 	keyNameByKeyVarName := make(map[string]string, 50)
 	for _, decl := range parsed.Decls {
@@ -76,7 +109,7 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 		for _, spec := range decl.Specs {
 			spec := spec.(*ast.ValueSpec)
 			if group, groupVar, ok := getGroupName(spec); ok {
-				groups[group] = make([]model.Field, 0, 50)
+				groups[group] = make([]field, 0, 50)
 				groupNameByGroupVarName[groupVar] = group
 			}
 		}
@@ -148,7 +181,7 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 			switch fun := callExpr.Fun.(type) {
 			case *ast.SelectorExpr:
 				_, ok := fun.X.(*ast.Ident)
-				if lookupFunc, lookupFuncFound := model.AllLookupFuncs[fun.Sel.Name]; ok && lookupFuncFound {
+				if lookupFunc, lookupFuncFound := lookupFuncs[fun.Sel.Name]; ok && lookupFuncFound {
 					args := callExpr.Args
 					var group, key string
 					var okGroup, okKey bool
@@ -168,11 +201,21 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 					}
 
 					if okGroup && okKey {
+						var found bool
 						for i := range groups[group] {
 							if groups[group][i].Key == key {
 								groups[group][i].LookupFunc = lookupFunc
+								found = true
 								break
 							}
+						}
+
+						if !found {
+							groups[group] = append(groups[group], field{
+								Group:      group,
+								Key:        key,
+								LookupFunc: lookupFunc,
+							})
 						}
 					} else if !okGroup && okKey {
 						for _, fields := range groups {
@@ -187,7 +230,7 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 				}
 			case *ast.Ident:
 				if lookupFuncName, ok := alternativeLookupMethods[fun.Name]; ok {
-					lookupFunc := model.AllLookupFuncs[lookupFuncName]
+					lookupFunc := lookupFuncs[lookupFuncName]
 					for _, expr := range callExprs[fun.Name] {
 						if expr.Pos() == fun.Pos() {
 							groupVarName := expr.Args[1].(*ast.Ident).Name
@@ -221,26 +264,21 @@ func parseQuadletSourceFile(file *os.File) (quadletSourceFileData, error) {
 					}
 				}
 			}
+			return false
 		}
 		return true
 	})
 
 	for group, fields := range groups {
-		if fields, ok := model.AdditionalFields[group]; ok {
-			for _, field := range fields {
-				groups[group] = append(groups[group], model.Field{Group: group, Key: field})
-			}
-		}
-
 		// Easier this way...
 		for i, field := range fields {
 			if strings.HasPrefix(field.Key, "Health") {
-				groups[group][i].LookupFunc = model.Lookup
+				groups[group][i].LookupFunc = lookupFuncs["Lookup"]
 			}
 		}
 	}
 
-	return quadletSourceFileData{fieldsByGroup: groups}, nil
+	return groups, nil
 }
 
 func getKeyVarName(spec *ast.ValueSpec) (keyVar string, keyName string, isKeyVar bool) {
@@ -257,19 +295,19 @@ func getKeyVarName(spec *ast.ValueSpec) (keyVar string, keyName string, isKeyVar
 	return "", "", false
 }
 
-func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) (group string, fields []model.Field, isKeyMap bool) {
+func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) (group string, fields []field, isKeyMap bool) {
 	group, ok := groupByKeyMap[spec.Names[0].Name]
 	if !ok {
 		return "", nil, false
 	}
 
 	value := spec.Values[0].(*ast.CompositeLit)
-	fields = make([]model.Field, 0, len(value.Elts))
+	fields = make([]field, 0, len(value.Elts))
 	for _, elt := range value.Elts {
 		kv := elt.(*ast.KeyValueExpr)
 		keyVarName := kv.Key.(*ast.Ident)
 		if keyName, ok := keyNameByKeyVarName[keyVarName.Name]; ok {
-			fields = append(fields, model.Field{Group: group, Key: keyName})
+			fields = append(fields, field{Group: group, Key: keyName})
 		}
 	}
 
