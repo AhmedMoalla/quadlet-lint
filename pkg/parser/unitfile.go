@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path"
 	"strconv"
@@ -24,6 +23,7 @@ type UnitValue struct {
 	Line   int
 	Column int
 
+	intValue     int
 	booleanValue bool
 }
 
@@ -69,6 +69,14 @@ func (r *LookupResult) BooleanValue() bool {
 	}
 
 	panic("lookup result does not have a boolean value")
+}
+
+func (r *LookupResult) IntValue() int {
+	if val := r.Value(); val != nil {
+		return val.intValue
+	}
+
+	panic("lookup result does not have an int value")
 }
 
 func (r *LookupResult) Value() *UnitValue {
@@ -123,8 +131,10 @@ func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
 			val, ok = f.lookupLast(field)
 		case lookup.LookupLastRaw:
 			val, ok = f.lookupLastRaw(field)
-		case lookup.LookupBooleanWithDefault:
+		case lookup.LookupBoolean, lookup.LookupBooleanWithDefault:
 			val, ok = f.lookupBoolean(field)
+		case lookup.LookupInt, lookup.LookupUint32:
+			val, ok = f.lookupInt(field)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
 		}
@@ -609,29 +619,25 @@ func convertNumber(v string) (int64, error) {
 	return intVal * mult, err
 }
 
-// Lookup the last instance of a key and convert the value to an int64
-func (f *UnitFile) LookupInt(field model.Field, defaultValue int64) int64 {
+// Lookup the last instance of a key and convert the value to an int
+func (f *UnitFile) lookupInt(field model.Field) (UnitValue, bool) {
 	v, ok := f.lookupBase(field)
 	if !ok {
-		return defaultValue
+		return UnitValue{}, false
 	}
 
 	intVal, err := convertNumber(v.Value)
-
 	if err != nil {
-		return defaultValue
+		return UnitValue{}, false
 	}
 
-	return intVal
-}
-
-// Lookup the last instance of a key and convert the value to an uint32
-func (f *UnitFile) LookupUint32(field model.Field, defaultValue uint32) uint32 {
-	v := f.LookupInt(field, int64(defaultValue))
-	if v < 0 || v > math.MaxUint32 {
-		return defaultValue
-	}
-	return uint32(v)
+	return UnitValue{
+		Key:      field.Key,
+		Value:    strconv.FormatInt(intVal, 10),
+		Line:     v.Line,
+		Column:   v.Column,
+		intValue: int(intVal),
+	}, true
 }
 
 // Look up every instance of the named key in the group
