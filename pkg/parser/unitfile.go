@@ -19,9 +19,12 @@ type unitLine struct {
 }
 
 type UnitValue struct {
+	Key    string
 	Value  string
 	Line   int
 	Column int
+
+	booleanValue bool
 }
 
 func (u *UnitValue) String() string {
@@ -57,47 +60,54 @@ type UnitFile struct {
 }
 
 type LookupResult struct {
-	values []UnitValue
+	Values []UnitValue
+}
+
+func (r *LookupResult) BooleanValue() bool {
+	if val := r.Value(); val != nil {
+		return val.booleanValue
+	}
+
+	panic("lookup result does not have a boolean value")
 }
 
 func (r *LookupResult) Value() *UnitValue {
-	if len(r.values) == 0 {
+	if len(r.Values) == 0 {
 		return nil
 	}
 
-	if len(r.values) != 1 {
+	if len(r.Values) != 1 {
 		panic("lookup result has more than one value")
 	}
 
-	return &r.values[0]
-}
-
-func (r *LookupResult) Values() []UnitValue {
-	return r.values
+	return &r.Values[0]
 }
 
 func singleResult(value UnitValue) LookupResult {
-	return LookupResult{values: []UnitValue{value}}
+	return LookupResult{Values: []UnitValue{value}}
 }
 
 func multiResult(values []UnitValue) (LookupResult, bool) {
-	return LookupResult{values: values}, len(values) > 0
+	return LookupResult{Values: values}, len(values) > 0
 }
 
-func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
-	key := field.Key
-	group := field.Group
+// TODO: Finish implementing the remaining LookupFuncs
+func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
 	if field.Multiple() {
 		var vals []UnitValue
 		switch field.LookupFunc {
 		case lookup.LookupAll:
-			vals = f.LookupAll(group, key)
+			vals = f.lookupAll(field)
 		case lookup.LookupAllRaw:
-			vals = f.LookupAllRaw(group, key)
+			vals = f.lookupAllRaw(field)
 		case lookup.LookupAllStrv:
-			vals = f.LookupAllStrv(group, key)
+			vals = f.lookupAllStrv(field)
 		case lookup.LookupAllArgs:
-			vals = f.LookupAllArgs(group, key)
+			vals = f.lookupAllArgs(field)
+		case lookup.LookupAllKeyVal:
+			vals = f.lookupAllKeyVal(field)
+		case lookup.LookupLastArgs:
+			vals, _ = f.lookupLastArgs(field)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
 				field.LookupFunc.Name, field.Key))
@@ -108,11 +118,13 @@ func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 		var ok bool
 		switch field.LookupFunc {
 		case lookup.Lookup:
-			val, ok = f.Lookup(group, key)
+			val, ok = f.lookupBase(field)
 		case lookup.LookupLast:
-			val, ok = f.LookupLast(group, key)
+			val, ok = f.lookupLast(field)
 		case lookup.LookupLastRaw:
-			val, ok = f.LookupLastRaw(group, key)
+			val, ok = f.lookupLastRaw(field)
+		case lookup.LookupBooleanWithDefault:
+			val, ok = f.lookupBoolean(field)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
 		}
@@ -371,6 +383,7 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	}
 
 	p.currentGroup.add(key, UnitValue{
+		Key:    key,
 		Value:  value,
 		Line:   p.lineNr,
 		Column: valueStart,
@@ -506,13 +519,13 @@ func (f *UnitFile) ListKeys(groupName string) []string {
 // Look up the last instance of the named key in the group (if any)
 // The result can have trailing whitespace, and Raw means it can
 // contain line continuations (\ at end of line)
-func (f *UnitFile) LookupLastRaw(groupName string, key string) (UnitValue, bool) {
-	g, ok := f.groupByName[groupName]
+func (f *UnitFile) lookupLastRaw(field model.Field) (UnitValue, bool) {
+	g, ok := f.groupByName[field.Group]
 	if !ok {
 		return UnitValue{}, false
 	}
 
-	line := g.findLast(key)
+	line := g.findLast(field.Key)
 	if line == nil {
 		return UnitValue{}, false
 	}
@@ -520,15 +533,15 @@ func (f *UnitFile) LookupLastRaw(groupName string, key string) (UnitValue, bool)
 	return line.value, true
 }
 
-func (f *UnitFile) HasKey(groupName string, key string) bool {
-	_, ok := f.LookupLastRaw(groupName, key)
+func (f *UnitFile) HasKey(field model.Field) bool {
+	_, ok := f.lookupLastRaw(field)
 	return ok
 }
 
 // Look up the last instance of the named key in the group (if any)
 // The result can have trailing whitespace, but line continuations are applied
-func (f *UnitFile) LookupLast(groupName string, key string) (UnitValue, bool) {
-	raw, ok := f.LookupLastRaw(groupName, key)
+func (f *UnitFile) lookupLast(field model.Field) (UnitValue, bool) {
+	raw, ok := f.lookupLastRaw(field)
 	if !ok {
 		return UnitValue{}, false
 	}
@@ -539,8 +552,8 @@ func (f *UnitFile) LookupLast(groupName string, key string) (UnitValue, bool) {
 
 // Look up the last instance of the named key in the group (if any)
 // The result have no trailing whitespace and line continuations are applied
-func (f *UnitFile) Lookup(groupName string, key string) (UnitValue, bool) {
-	v, ok := f.LookupLast(groupName, key)
+func (f *UnitFile) lookupBase(field model.Field) (UnitValue, bool) {
+	v, ok := f.lookupLast(field)
 	if !ok {
 		return UnitValue{}, false
 	}
@@ -551,27 +564,23 @@ func (f *UnitFile) Lookup(groupName string, key string) (UnitValue, bool) {
 }
 
 // Lookup the last instance of a key and convert the value to a bool
-func (f *UnitFile) LookupBoolean(groupName string, key string) (bool, bool) {
-	v, ok := f.Lookup(groupName, key)
+func (f *UnitFile) lookupBoolean(field model.Field) (UnitValue, bool) {
+	v, ok := f.lookupBase(field)
 	if !ok {
-		return false, false
+		return UnitValue{Value: "false", booleanValue: false, Line: v.Line, Column: v.Column}, false
 	}
 
 	value := v.Value
-	return strings.EqualFold(value, "1") ||
+	booleanValue := strings.EqualFold(value, "1") ||
 		strings.EqualFold(value, "yes") ||
 		strings.EqualFold(value, "true") ||
-		strings.EqualFold(value, "on"), true
-}
-
-// Lookup the last instance of a key and convert the value to a bool
-func (f *UnitFile) LookupBooleanWithDefault(groupName string, key string, defaultValue bool) bool {
-	v, ok := f.LookupBoolean(groupName, key)
-	if !ok {
-		return defaultValue
-	}
-
-	return v
+		strings.EqualFold(value, "on")
+	return UnitValue{
+		Value:        strconv.FormatBool(booleanValue),
+		booleanValue: booleanValue,
+		Line:         v.Line,
+		Column:       v.Column,
+	}, true
 }
 
 /* Mimics strol, which is what systemd uses */
@@ -601,8 +610,8 @@ func convertNumber(v string) (int64, error) {
 }
 
 // Lookup the last instance of a key and convert the value to an int64
-func (f *UnitFile) LookupInt(groupName string, key string, defaultValue int64) int64 {
-	v, ok := f.Lookup(groupName, key)
+func (f *UnitFile) LookupInt(field model.Field, defaultValue int64) int64 {
+	v, ok := f.lookupBase(field)
 	if !ok {
 		return defaultValue
 	}
@@ -617,8 +626,8 @@ func (f *UnitFile) LookupInt(groupName string, key string, defaultValue int64) i
 }
 
 // Lookup the last instance of a key and convert the value to an uint32
-func (f *UnitFile) LookupUint32(groupName string, key string, defaultValue uint32) uint32 {
-	v := f.LookupInt(groupName, key, int64(defaultValue))
+func (f *UnitFile) LookupUint32(field model.Field, defaultValue uint32) uint32 {
+	v := f.LookupInt(field, int64(defaultValue))
 	if v < 0 || v > math.MaxUint32 {
 		return defaultValue
 	}
@@ -628,8 +637,8 @@ func (f *UnitFile) LookupUint32(groupName string, key string, defaultValue uint3
 // Look up every instance of the named key in the group
 // The result can have trailing whitespace, and Raw means it can
 // contain line continuations (\ at end of line)
-func (f *UnitFile) LookupAllRaw(groupName string, key string) []UnitValue {
-	g, ok := f.groupByName[groupName]
+func (f *UnitFile) lookupAllRaw(field model.Field) []UnitValue {
+	g, ok := f.groupByName[field.Group]
 	if !ok {
 		return make([]UnitValue, 0)
 	}
@@ -637,7 +646,7 @@ func (f *UnitFile) LookupAllRaw(groupName string, key string) []UnitValue {
 	values := make([]UnitValue, 0)
 
 	for _, line := range g.lines {
-		if line.isKey(key) {
+		if line.isKey(field.Key) {
 			if len(line.value.Value) == 0 {
 				// Empty value clears all before
 				values = make([]UnitValue, 0)
@@ -652,8 +661,8 @@ func (f *UnitFile) LookupAllRaw(groupName string, key string) []UnitValue {
 
 // Look up every instance of the named key in the group
 // The result can have trailing whitespace, but line continuations are applied
-func (f *UnitFile) LookupAll(groupName string, key string) []UnitValue {
-	values := f.LookupAllRaw(groupName, key)
+func (f *UnitFile) lookupAll(field model.Field) []UnitValue {
+	values := f.lookupAllRaw(field)
 	for i, raw := range values {
 		values[i].Value = applyLineContinuation(raw.Value)
 	}
@@ -664,8 +673,8 @@ func (f *UnitFile) LookupAll(groupName string, key string) []UnitValue {
 // separated words (including handling quoted words) and combine them all into
 // one array of words. The split code is compatible with the systemd config_parse_strv().
 // This is typically used by systemd keys like "RequiredBy" and "Aliases".
-func (f *UnitFile) LookupAllStrv(groupName string, key string) []UnitValue {
-	values := f.LookupAll(groupName, key)
+func (f *UnitFile) lookupAllStrv(field model.Field) []UnitValue {
+	values := f.lookupAll(field)
 	res := make([]UnitValue, len(values))
 	for _, value := range values {
 		res, _ = splitStringAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
@@ -677,9 +686,9 @@ func (f *UnitFile) LookupAllStrv(groupName string, key string) []UnitValue {
 // separated words (including handling quoted words) and combine them all into
 // one array of words. The split code is exec-like, and both unquotes and applied
 // c-style c escapes.
-func (f *UnitFile) LookupAllArgs(groupName string, key string) []UnitValue {
+func (f *UnitFile) lookupAllArgs(field model.Field) []UnitValue {
 	res := make([]UnitValue, 0)
-	argsv := f.LookupAll(groupName, key)
+	argsv := f.lookupAll(field)
 	for _, argsS := range argsv {
 		args, err := splitString(argsS, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
@@ -694,8 +703,8 @@ func (f *UnitFile) LookupAllArgs(groupName string, key string) []UnitValue {
 // array of words. The split code is exec-like, and both unquotes and
 // applied c-style c escapes.  This is typically used for keys like
 // ExecStart
-func (f *UnitFile) LookupLastArgs(groupName string, key string) ([]UnitValue, bool) {
-	execKey, ok := f.LookupLast(groupName, key)
+func (f *UnitFile) lookupLastArgs(field model.Field) ([]UnitValue, bool) {
+	execKey, ok := f.lookupLast(field)
 	if ok {
 		execArgs, err := splitString(execKey, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
@@ -706,16 +715,21 @@ func (f *UnitFile) LookupLastArgs(groupName string, key string) ([]UnitValue, bo
 }
 
 // Look up 'Environment' style key-value keys
-func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]string {
-	res := make(map[string]string)
-	allKeyvals := f.LookupAll(groupName, key)
+func (f *UnitFile) lookupAllKeyVal(field model.Field) []UnitValue {
+	res := make([]UnitValue, 0)
+	allKeyvals := f.lookupAll(field)
 	for _, keyvals := range allKeyvals {
 		assigns, err := splitString(keyvals, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
 			for _, assign := range assigns {
 				key, value, found := strings.Cut(assign.Value, "=")
 				if found {
-					res[key] = value
+					res = append(res, UnitValue{
+						Key:    key,
+						Value:  value,
+						Line:   assign.Line,
+						Column: assign.Column, // TODO: Not Correct, should be offset by the position of the keypair
+					})
 				}
 			}
 		}
@@ -723,7 +737,7 @@ func (f *UnitFile) LookupAllKeyVal(groupName string, key string) map[string]stri
 	return res
 }
 
-func (f *UnitFile) HasValue(groupName string, key string) bool {
-	value, found := f.Lookup(groupName, key)
+func (f *UnitFile) HasValue(field model.Field) bool {
+	value, found := f.lookupBase(field)
 	return found && len(value.Value) > 0
 }

@@ -38,6 +38,12 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, 0, 0,
 					fmt.Sprintf("key '%s' is not allowed in group '%s'", key, group)))
 			}
+
+			if res, ok := unit.Lookup(allowedFields[key]); ok && len(res.Values) == 0 {
+				validationErrors = append(validationErrors, *V.Err(v.Name(), V.EmptyValue, 0, 0,
+					fmt.Sprintf("key '%s' in group '%s' has an empty value", key, group)))
+			}
+
 		}
 	}
 	return validationErrors

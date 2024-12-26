@@ -35,10 +35,11 @@ func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field M.Field) []
 		return nil
 	}
 
-	value, ok := unit.Lookup(field.Group, field.Key)
+	res, ok := unit.Lookup(field)
 	if !ok {
 		return nil
 	}
+	value := res.Value()
 	imageName := value.Value
 
 	if strings.HasSuffix(imageName, P.UnitTypeBuild.Ext) || strings.HasSuffix(imageName, P.UnitTypeImage.Ext) {

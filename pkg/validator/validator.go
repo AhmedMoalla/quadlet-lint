@@ -32,6 +32,7 @@ var (
 	DeprecatedKey         = NewErrorType("deprecated-key", LevelWarning)
 	UnsatisfiedDependency = NewErrorType("unsatisfied-dependency", LevelError)
 	InvalidReference      = NewErrorType("invalid-reference", LevelError)
+	EmptyValue            = NewErrorType("empty-value", LevelError)
 )
 
 type ValidationError struct {

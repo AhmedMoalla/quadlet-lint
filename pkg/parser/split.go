@@ -420,9 +420,10 @@ func splitStringAppend(appendTo []UnitValue, u UnitValue, separators string, fla
 			break
 		}
 		appendTo = append(appendTo, UnitValue{
+			Key:    u.Key,
 			Value:  word,
 			Line:   u.Line,
-			Column: u.Column, // TODO: Not Correct, should be offset
+			Column: u.Column, // TODO: Not Correct, should be offset by the position of the keypair
 		})
 		s = remaining
 	}
