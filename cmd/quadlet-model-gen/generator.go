@@ -40,9 +40,9 @@ func generateSourceFiles(data quadletSourceFileData) error {
 	return nil
 }
 
-type FileGenerator = func(*bytes.Buffer, map[string][]string)
+type FileGenerator = func(*bytes.Buffer, map[string][]model.Field)
 
-func generateFile(outputDir string, fieldsByGroup map[string][]string, filename string, generateFileContent FileGenerator) error {
+func generateFile(outputDir string, fieldsByGroup map[string][]model.Field, filename string, generateFileContent FileGenerator) error {
 	dir, filename := filepath.Split(filename)
 	fileDir := filepath.Join(outputDir, dir)
 	if len(dir) > 0 {
@@ -75,7 +75,7 @@ func generateFile(outputDir string, fieldsByGroup map[string][]string, filename 
 	return nil
 }
 
-func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]string) {
+func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]model.Field) {
 	b.WriteString("package model\n\n")
 	b.WriteString("import (\n")
 	for group := range fieldsByGroup {
@@ -94,7 +94,7 @@ func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]string) {
 	for group, fields := range fieldsByGroup {
 		b.WriteString(fmt.Sprintf("\t\"%s\": {\n", group))
 		for _, field := range fields {
-			b.WriteString(fmt.Sprintf("\t\t\"%s\": %s.%s,\n", field, strings.ToLower(group), field))
+			b.WriteString(fmt.Sprintf("\t\t\"%s\": %s.%s,\n", field.Key, strings.ToLower(group), field.Key))
 		}
 		b.WriteString("\t},\n")
 	}
@@ -102,7 +102,7 @@ func groupsFile(b *bytes.Buffer, fieldsByGroup map[string][]string) {
 }
 
 func groupFile(group string) FileGenerator {
-	return func(b *bytes.Buffer, fieldsByGroup map[string][]string) {
+	return func(b *bytes.Buffer, fieldsByGroup map[string][]model.Field) {
 		b.WriteString(fmt.Sprintf("package %s\n\n", strings.ToLower(group)))
 		if len(fieldsByGroup[group]) > 0 {
 			b.WriteString("import (\n")
@@ -113,23 +113,14 @@ func groupFile(group string) FileGenerator {
 
 		b.WriteString(fmt.Sprintf("type G%s struct {\n", group))
 		for _, field := range fieldsByGroup[group] {
-			b.WriteString(fmt.Sprintf("\t%s []V.Rule\n", field))
+			b.WriteString(fmt.Sprintf("\t%s []V.Rule\n", field.Key))
 		}
 		b.WriteString("}\n\n")
 
 		b.WriteString("var (\n")
-		for _, fieldName := range fieldsByGroup[group] {
-			field := model.Field{
-				Group: group,
-				Key:   fieldName,
-			}
-
-			if meta, ok := model.FieldsMetadata[group][fieldName]; ok {
-				field.Multiple = meta.Multiple
-			}
-
-			fieldStr := strings.Replace(fmt.Sprintf("%#v", field), "model.", "M.", 1)
-			b.WriteString(fmt.Sprintf("\t%s = %s\n", fieldName, fieldStr))
+		for _, field := range fieldsByGroup[group] {
+			fieldStr := strings.ReplaceAll(fmt.Sprintf("%#v", field), "model.", "M.")
+			b.WriteString(fmt.Sprintf("\t%s = %s\n", field.Key, fieldStr))
 		}
 		b.WriteString(")\n")
 	}

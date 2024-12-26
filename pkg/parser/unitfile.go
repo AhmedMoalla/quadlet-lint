@@ -86,34 +86,34 @@ func multiResult(values []UnitValue) (LookupResult, bool) {
 func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 	key := field.Key
 	group := field.Group
-	if field.Multiple {
+	if field.Multiple() {
 		var vals []UnitValue
-		switch field.LookupMode {
-		case model.LookupModeAll:
+		switch field.LookupFunc {
+		case model.LookupAll:
 			vals = f.LookupAll(group, key)
-		case model.LookupModeAllRaw:
+		case model.LookupAllRaw:
 			vals = f.LookupAllRaw(group, key)
-		case model.LookupModeAllStrv:
+		case model.LookupAllStrv:
 			vals = f.LookupAllStrv(group, key)
-		case model.LookupModeAllArgs:
+		case model.LookupAllArgs:
 			vals = f.LookupAllArgs(group, key)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
-				field.LookupMode, field.Key))
+				field.LookupFunc, field.Key))
 		}
 		return multiResult(vals)
 	} else {
 		var val UnitValue
 		var ok bool
-		switch field.LookupMode {
-		case model.LookupModeBase:
+		switch field.LookupFunc {
+		case model.Lookup:
 			val, ok = f.Lookup(group, key)
-		case model.LookupModeLast:
+		case model.LookupLast:
 			val, ok = f.LookupLast(group, key)
-		case model.LookupModeLastRaw:
+		case model.LookupLastRaw:
 			val, ok = f.LookupLastRaw(group, key)
 		default:
-			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupMode, field.Key))
+			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc, field.Key))
 		}
 		return singleResult(val), ok
 	}

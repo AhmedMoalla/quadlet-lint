@@ -93,7 +93,7 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 		}
 
 		var values []P.UnitValue
-		if field.Multiple {
+		if field.Multiple() {
 			values = unit.LookupAll(field.Group, field.Key)
 		} else if value, found := unit.Lookup(field.Group, field.Key); found {
 			values = []P.UnitValue{value}
@@ -127,9 +127,9 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 }
 
 func HaveFormat(format Format) ValuesValidator {
-	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
+	return func(validator V.Validator, field Field, values []P.UnitValue) *V.ValidationError {
 		for _, value := range values {
-			err := format.ParseAndValidate(value)
+			err := format.ParseAndValidate(value.Value)
 			if err != nil {
 				return V.Err(validator.Name(), V.InvalidValue, 0, 0, err.Error())
 			}
@@ -200,7 +200,7 @@ func ValuesMust(valuePredicate ValuesValidator, rulePredicate RulePredicate, mes
 		if rulePredicate(validator, unit, field) {
 			// TODO: Should use correct Lookup function depending on the field
 			// Refactor Lookup function to take Field instances
-			// Fields should define LookupMode property that tells which Lookup function to use
+			// Fields should define LookupFunc property that tells which Lookup function to use
 			values := unit.LookupAllStrv(field.Group, field.Key)
 			if err := valuePredicate(validator, field, values); err != nil {
 				errorMsg := buildErrorMessage(messageAndArgs, err)
@@ -230,7 +230,7 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 
 // ================== ValuesValidators ==================
 
-type ValuesValidator func(validator V.Validator, field Field, values []string) *V.ValidationError
+type ValuesValidator func(validator V.Validator, field Field, values []P.UnitValue) *V.ValidationError
 type RulePredicate func(validator V.Validator, unit P.UnitFile, field Field) bool
 
 // TODO: line and column number not implemented
@@ -261,9 +261,9 @@ func Always(_ V.Validator, _ P.UnitFile, _ Field) bool {
 }
 
 func MatchRegexp(regexp regexp.Regexp) ValuesValidator {
-	return func(validator V.Validator, field Field, values []string) *V.ValidationError {
+	return func(validator V.Validator, field Field, values []P.UnitValue) *V.ValidationError {
 		for _, value := range values {
-			if !regexp.MatchString(value) {
+			if !regexp.MatchString(value.Value) {
 				return V.Err(validator.Name(), V.InvalidValue, 0, 0,
 					fmt.Sprintf("Must match regexp '%s'", regexp.String()))
 			}

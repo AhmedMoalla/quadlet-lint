@@ -19,21 +19,6 @@ var (
 	podmanVersion = flag.String(podmanVersionFlag, "", "Podman's tag used to download the source file for code generation")
 )
 
-// Download the quadlet.go file from given podman tag version
-//
-//	Use: https://raw.githubusercontent.com/containers/podman/refs/tags/v5.3.1/pkg/systemd/quadlet/quadlet.go
-//
-// Parse the group variables to extract group names
-// Create a groups.go file and create the Groups struct in it
-// For each group:
-// - Generate a package with a single file under the validator/generated package
-// - In the file:
-//   - Create a struct with the group's name and add a field of type []V.Rule for each supported key (Supported keys are in the maps, e.g.: supportedContainerKeys for Container group for example)
-//   - Create a variable of type P.Field for each supported field encountered
-//
-// - In the groups.go file:
-//   - Add a field for the group pointing to the structure created previously
-//   - Add all the fields in the Fields map
 func main() {
 	flag.Parse()
 
