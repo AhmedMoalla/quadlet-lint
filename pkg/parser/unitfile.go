@@ -100,7 +100,7 @@ func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 			vals = f.LookupAllArgs(group, key)
 		default:
 			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
-				field.LookupFunc, field.Key))
+				field.LookupFunc.Name, field.Key))
 		}
 		return multiResult(vals)
 	} else {
@@ -114,7 +114,7 @@ func (f *UnitFile) Lookup_(field model.Field) (LookupResult, bool) {
 		case lookup.LookupLastRaw:
 			val, ok = f.LookupLastRaw(group, key)
 		default:
-			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc, field.Key))
+			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
 		}
 		return singleResult(val), ok
 	}

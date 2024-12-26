@@ -114,7 +114,7 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 
 					if !foundUnit {
 						validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidReference, value.Line, value.Column,
-							fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType, value)))
+							fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType.Name, value.Value)))
 					}
 				}
 
@@ -145,7 +145,7 @@ func AllowedValues(allowedValues ...string) V.Rule {
 		if ok && !slices.Contains(allowedValues, value.Value) {
 			return ErrSlice(validator.Name(), V.InvalidValue, value.Line, value.Column,
 				fmt.Sprintf("invalid value '%s' for key '%s'. Allowed values: %s",
-					value, field, allowedValues))
+					value.Value, field, allowedValues))
 		}
 		return nil
 	}
@@ -160,7 +160,7 @@ func HasSuffix(suffix string) V.Rule {
 
 		if !strings.HasSuffix(value.Value, suffix) {
 			return ErrSlice(validator.Name(), V.InvalidValue, value.Line, value.Column,
-				fmt.Sprintf("value '%s' must have suffix '%s'", value, suffix))
+				fmt.Sprintf("value '%s' must have suffix '%s'", value.Value, suffix))
 		}
 
 		return nil
@@ -178,7 +178,7 @@ func DependsOn(dependency Field) V.Rule {
 		if !dependencyOk && fieldOk {
 			return ErrSlice(validator.Name(), V.UnsatisfiedDependency, value.Line, 0,
 				fmt.Sprintf("value for '%s' was set but it depends on key '%s' which was not found",
-					field, dependency))
+					field, dependency.Value))
 		}
 
 		return nil

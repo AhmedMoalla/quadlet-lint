@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+
 	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
