@@ -407,11 +407,12 @@ finishForceNext:
 	return s.String(), in[p:], true, nil
 }
 
-func splitStringAppend(appendTo []UnitValue, u UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
+func splitValueAppend(appendTo []UnitValue, u UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
 	orig := appendTo
 	s := u.Value
+	column := u.Column
 	for {
-		word, remaining, moreWords, err := extractFirstWord(s, separators, flags)
+		word, remaining, moreWords, err := extractFirstWord(s, separators, flags|SplitRetainSeparators)
 		if err != nil {
 			return orig, err
 		}
@@ -423,15 +424,22 @@ func splitStringAppend(appendTo []UnitValue, u UnitValue, separators string, fla
 			Key:    u.Key,
 			Value:  word,
 			Line:   u.Line,
-			Column: u.Column, // TODO: Not Correct, should be offset by the position of the keypair
+			Column: column,
 		})
 		s = remaining
+		for _, char := range remaining {
+			if !strings.ContainsRune(WhitespaceSeparators, char) {
+				break
+			}
+			column++
+		}
+		column += len(word)
 	}
 	return appendTo, nil
 }
 
 func splitString(s UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
-	return splitStringAppend(make([]UnitValue, 0), s, separators, flags)
+	return splitValueAppend(make([]UnitValue, 0), s, separators, flags)
 }
 
 func charNeedEscape(c rune, isPath bool) bool {

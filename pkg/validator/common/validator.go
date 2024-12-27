@@ -24,7 +24,6 @@ func (v commonValidator) Context() V.Context {
 
 var ignoreGroups = map[string]bool{"Service": true, "Install": true, "Unit": true}
 
-// TODO: line and column position not implemented
 func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 	for _, group := range unit.ListGroups() {
@@ -34,14 +33,14 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 
 		allowedFields := model.Fields[group]
 		for _, key := range unit.ListKeys(group) {
-			if _, ok := allowedFields[key]; !ok {
-				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, 0, 0,
-					fmt.Sprintf("key '%s' is not allowed in group '%s'", key, group)))
+			if _, ok := allowedFields[key.Key]; !ok {
+				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, key.Line, 0,
+					fmt.Sprintf("key '%s' is not allowed in group '%s'", key.Key, group)))
 			}
 
-			if res, ok := unit.Lookup(allowedFields[key]); ok && len(res.Values) == 0 {
-				validationErrors = append(validationErrors, *V.Err(v.Name(), V.EmptyValue, 0, 0,
-					fmt.Sprintf("key '%s' in group '%s' has an empty value", key, group)))
+			if res, ok := unit.Lookup(allowedFields[key.Key]); ok && len(res.Values) == 0 {
+				validationErrors = append(validationErrors, *V.Err(v.Name(), V.EmptyValue, key.Line, 0,
+					fmt.Sprintf("key '%s' in group '%s' has an empty value", key.Key, group)))
 			}
 
 		}

@@ -236,10 +236,10 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 type ValuesValidator func(validator V.Validator, field Field, values []P.UnitValue) *V.ValidationError
 type RulePredicate func(validator V.Validator, unit P.UnitFile, field Field) bool
 
-// TODO: line and column number not implemented
 func HaveZeroOrOneValues(validator V.Validator, _ Field, values []P.UnitValue) *V.ValidationError {
 	if len(values) > 1 {
-		return V.Err(validator.Name(), V.InvalidValue, 0, 0, "should have exactly zero or one value")
+		value := values[1]
+		return V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column, "should have exactly zero or one value")
 	}
 
 	return nil

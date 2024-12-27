@@ -17,6 +17,11 @@ type unitLine struct {
 	value UnitValue
 }
 
+type UnitKey struct {
+	Key  string
+	Line int
+}
+
 type UnitValue struct {
 	Key    string
 	Value  string
@@ -99,7 +104,6 @@ func multiResult(values []UnitValue) (LookupResult, bool) {
 	return LookupResult{Values: values}, len(values) > 0
 }
 
-// TODO: Finish implementing the remaining LookupFuncs
 func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
 	if field.Multiple() {
 		var vals []UnitValue
@@ -508,17 +512,17 @@ func (f *UnitFile) ListGroups() []string {
 	return groups
 }
 
-func (f *UnitFile) ListKeys(groupName string) []string {
+func (f *UnitFile) ListKeys(groupName string) []UnitKey {
 	g, ok := f.groupByName[groupName]
 	if !ok {
-		return make([]string, 0)
+		return make([]UnitKey, 0)
 	}
 
 	hash := make(map[string]struct{})
-	keys := make([]string, 0, len(g.lines))
-	for _, line := range g.lines {
+	keys := make([]UnitKey, 0, len(g.lines))
+	for lineNumber, line := range g.lines {
 		if _, ok := hash[line.key]; !ok {
-			keys = append(keys, line.key)
+			keys = append(keys, UnitKey{Key: line.key, Line: lineNumber + 1})
 			hash[line.key] = struct{}{}
 		}
 	}
@@ -683,7 +687,7 @@ func (f *UnitFile) lookupAllStrv(field model.Field) []UnitValue {
 	values := f.lookupAll(field)
 	res := make([]UnitValue, len(values))
 	for _, value := range values {
-		res, _ = splitStringAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
+		res, _ = splitValueAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
 	}
 	return res
 }
@@ -734,7 +738,7 @@ func (f *UnitFile) lookupAllKeyVal(field model.Field) []UnitValue {
 						Key:    key,
 						Value:  value,
 						Line:   assign.Line,
-						Column: assign.Column, // TODO: Not Correct, should be offset by the position of the keypair
+						Column: assign.Column,
 					})
 				}
 			}
