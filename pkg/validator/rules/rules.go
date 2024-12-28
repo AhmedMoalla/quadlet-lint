@@ -92,8 +92,8 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 			return nil
 		}
 
-		res, ok := unit.Lookup(field)
-		if !ok || len(res.Values) == 0 {
+		res, found := unit.Lookup(field)
+		if !found || len(res.Values) == 0 {
 			return nil
 		}
 
@@ -120,25 +120,36 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 	}
 }
 
-func HaveFormat(format Format) ValuesValidator {
-	return func(validator V.Validator, _ Field, values []P.UnitValue) *V.ValidationError {
-		for _, value := range values {
+func HaveFormat(format Format) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+		res, found := unit.Lookup(field)
+		if !found {
+			return nil
+		}
+
+		validationErrors := make([]V.ValidationError, 0)
+		for _, value := range res.Values {
 			err := format.ParseAndValidate(value.Value)
 			if err != nil {
-				return V.Err(validator.Name(), V.InvalidValue, 0, 0, err.Error())
+				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line,
+					value.Column, err.Error()))
 			}
 		}
 
-		return nil
+		return validationErrors
 	}
 }
 
 func AllowedValues(allowedValues ...string) V.Rule {
 	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
-		res, ok := unit.Lookup(field)
+		res, found := unit.Lookup(field)
+		if !found {
+			return nil
+		}
+
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range res.Values {
-			if ok && !slices.Contains(allowedValues, value.Value) {
+			if !slices.Contains(allowedValues, value.Value) {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
 					fmt.Sprintf("invalid value '%s' for key '%s'. Allowed values: %s",
 						value.Value, field, allowedValues)))
@@ -189,24 +200,50 @@ func DependsOn(dependency Field) V.Rule {
 }
 
 func Deprecated(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
-	if res, found := unit.Lookup(field); found {
-		for _, value := range res.Values {
-			return ErrSlice(validator.Name(), V.DeprecatedKey, value.Line, 0,
-				fmt.Sprintf("key '%s' is deprecated and should not be used", field))
-		}
+	res, found := unit.Lookup(field)
+	if !found {
+		return nil
 	}
 
-	return nil
+	validationErrors := make([]V.ValidationError, 0)
+	for _, value := range res.Values {
+		validationErrors = append(validationErrors, *V.Err(validator.Name(), V.DeprecatedKey, value.Line, 0,
+			fmt.Sprintf("key '%s' is deprecated and should not be used", field)))
+	}
+	return validationErrors
 }
 
-// TODO: line and column number not implemented
+func MatchRegexp(regex *regexp.Regexp) V.Rule {
+	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+		res, found := unit.Lookup(field)
+		if !found {
+			return nil
+		}
+
+		validationErrors := make([]V.ValidationError, 0)
+		for _, value := range res.Values {
+			if !regex.MatchString(value.Value) {
+				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
+					fmt.Sprintf("Must match regexp '%s'", regex.String())))
+			}
+		}
+		return validationErrors
+	}
+}
+
 func ValuesMust(valuesPredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) V.Rule {
 	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
 		if rulePredicate(validator, unit, field) {
 			if res, ok := unit.Lookup(field); ok {
 				if err := valuesPredicate(validator, field, res.Values); err != nil {
 					errorMsg := buildErrorMessage(messageAndArgs, err)
-					return ErrSlice(validator.Name(), V.InvalidValue, 0, 0, errorMsg)
+					var line, column int
+					if len(res.Values) > 0 {
+						firstValue := res.Values[0]
+						line = firstValue.Line
+						column = firstValue.Column
+					}
+					return ErrSlice(validator.Name(), V.InvalidValue, line, column, errorMsg)
 				}
 			}
 		}
@@ -258,21 +295,5 @@ func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredic
 		}
 
 		return false
-	}
-}
-
-func Always(_ V.Validator, _ P.UnitFile, _ Field) bool {
-	return true
-}
-
-func MatchRegexp(regexp regexp.Regexp) ValuesValidator {
-	return func(validator V.Validator, _ Field, values []P.UnitValue) *V.ValidationError {
-		for _, value := range values {
-			if !regexp.MatchString(value.Value) {
-				return V.Err(validator.Name(), V.InvalidValue, 0, 0,
-					fmt.Sprintf("Must match regexp '%s'", regexp.String()))
-			}
-		}
-		return nil
 	}
 }

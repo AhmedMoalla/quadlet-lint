@@ -1,7 +1,6 @@
 package quadlet
 
 import (
-	"fmt"
 	"regexp"
 
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
@@ -46,8 +45,8 @@ func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 			),
 			Network: Rules(
 				CanReference(P.UnitTypeNetwork, P.UnitTypeContainer),
-				ValuesMust(MatchRegexp(*networkRegexp), Always, "Network value has an invalid format"),
-				ValuesMust(HaveFormat(NetworkFormat), Always),
+				MatchRegexp(networkRegexp),
+				HaveFormat(NetworkFormat),
 			),
 			Volume: Rules(CanReference(P.UnitTypeVolume)),
 			Mount:  Rules(CanReference(P.UnitTypeVolume)),
@@ -72,8 +71,7 @@ func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
 				Deprecated, ConflictsWithNewUserMappingKeys,
 				AllowedValues("manual", "auto", "keep-id"),
 			),
-			ExposeHostPort: Rules(ValuesMust(MatchRegexp(*exposeHostPortRegexp), Always,
-				fmt.Sprintf("ExposeHostPort invalid port format. Must match regexp '%s'", exposeHostPortRegexp))),
+			ExposeHostPort: Rules(MatchRegexp(exposeHostPortRegexp)),
 		},
 		Service: GService{
 			KillMode: Rules(AllowedValues("mixed", "control-group")),

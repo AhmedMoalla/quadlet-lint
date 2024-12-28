@@ -35,8 +35,8 @@ func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field M.Field) []
 		return nil
 	}
 
-	res, ok := unit.Lookup(field)
-	if !ok {
+	res, found := unit.Lookup(field)
+	if !found {
 		return nil
 	}
 	value := res.Value()
