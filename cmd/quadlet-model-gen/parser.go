@@ -42,8 +42,7 @@ type lookupFunc struct {
 }
 
 func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error) {
-	fset := token.NewFileSet()
-	parsed, err := parser.ParseFile(fset, file.Name(), nil, parser.ParseComments)
+	parsed, err := parser.ParseFile(token.NewFileSet(), file.Name(), nil, parser.SkipObjectResolution)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +74,7 @@ func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error)
 
 // TODO: This is bad. Refactor.
 func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
-	fset := token.NewFileSet()
-	parsed, err := parser.ParseFile(fset, file.Name(), nil, parser.SkipObjectResolution)
+	parsed, err := parser.ParseFile(token.NewFileSet(), file.Name(), nil, parser.SkipObjectResolution)
 	if err != nil {
 		return nil, err
 	}
@@ -143,15 +141,12 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	funcDecls := make(map[string][]*ast.FuncDecl)
 	callExprs := make(map[string][]*ast.CallExpr)
 
-	// Traverse the AST
 	var currentFunc *ast.FuncDecl
 	ast.Inspect(parsed, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.FuncDecl:
-			// Track the current function declaration
 			currentFunc = node
 		case *ast.CallExpr:
-			// Associate the CallExpr with the current function
 			if currentFunc != nil {
 				var callName string
 				if ident, ok := node.Fun.(*ast.Ident); ok {
