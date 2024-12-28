@@ -7,9 +7,9 @@ fmt:
 	go run golang.org/x/tools/cmd/goimports@latest -local 'github.com/AhmedMoalla/quadlet-lint' -w .
 
 generate: fmt
-	go generate ./...
+	go generate -v ./...
 
 build: generate
 	go vet ./...
 	mkdir -p bin
-	go build -o bin ./cmd/quadlet-lint
+	go build -v -o bin ./cmd/quadlet-lint
