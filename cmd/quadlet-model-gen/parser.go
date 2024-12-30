@@ -301,14 +301,15 @@ func getKeyVarName(spec *ast.ValueSpec) (string, string, bool) {
 	return "", "", false
 }
 
-func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) (group string, fields []field, isKeyMap bool) {
+// getGroupFields extracts the group and its fields from the map variables listing the supported fields for each group
+func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) (string, []field, bool) {
 	group, ok := groupByKeyMap[spec.Names[0].Name]
 	if !ok {
 		return "", nil, false
 	}
 
 	value := spec.Values[0].(*ast.CompositeLit)
-	fields = make([]field, 0, len(value.Elts))
+	fields := make([]field, 0, len(value.Elts))
 	for _, elt := range value.Elts {
 		kv := elt.(*ast.KeyValueExpr)
 		keyVarName := kv.Key.(*ast.Ident)

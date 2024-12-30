@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -26,9 +25,8 @@ type Format struct {
 func (f *Format) ParseAndValidate(value string) error {
 	split := strings.Split(value, f.ValueSeparator)
 	if len(split) == 0 || len(split) > 2 {
-		return errors.New(
-			fmt.Sprintf("'%s' does not match the '%s' format because it is expected to have 2 parts after "+
-				"splitting the value with '%s' but got instead %d parts", value, f.Name, f.ValueSeparator, len(split)))
+		return fmt.Errorf("'%s' does not match the '%s' format because it is expected to have 2 parts after "+
+			"splitting the value with '%s' but got instead %d parts", value, f.Name, f.ValueSeparator, len(split))
 	}
 
 	f.Value = split[0]

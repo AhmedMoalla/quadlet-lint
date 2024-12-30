@@ -10,10 +10,12 @@ import (
 )
 
 const (
-	podmanVersionFlag          = "podman-version"
-	podmanVersionEnvKey        = "PODMAN_VERSION"
-	quadletFileLocation        = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/quadlet/quadlet.go"
-	unitfileParserFileLocation = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s/pkg/systemd/parser/unitfile.go"
+	podmanVersionFlag   = "podman-version"
+	podmanVersionEnvKey = "PODMAN_VERSION"
+
+	podmanGithubTagsURL        = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s"
+	quadletFileLocation        = podmanGithubTagsURL + "/pkg/systemd/quadlet/quadlet.go"
+	unitfileParserFileLocation = podmanGithubTagsURL + "/pkg/systemd/parser/unitfile.go"
 	baseModelPackageName       = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 )
 
@@ -27,30 +29,30 @@ func main() {
 	podmanVersion := getPodmanVersion(*podmanVersion)
 	unitfileParserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, podmanVersion)
 	if err != nil {
-		exit(fmt.Errorf("could not download unitfile.go source file: %s", err))
+		exit(fmt.Errorf("could not download unitfile.go source file: %w", err))
 	}
 	defer os.Remove(unitfileParserFile.Name())
 
 	lookupFuncs, err := parseUnitFileParserSourceFile(unitfileParserFile)
 	if err != nil {
-		exit(fmt.Errorf("could not parse unitfile parser source file: %s", err))
+		exit(fmt.Errorf("could not parse unitfile parser source file: %w", err))
 	}
 
 	quadletSourceFile, err := downloadSourceFileFromGithub(quadletFileLocation, podmanVersion)
 	if err != nil {
-		exit(fmt.Errorf("could not download quadlet.go source file: %s", err))
+		exit(fmt.Errorf("could not download quadlet.go source file: %w", err))
 	}
 	defer os.Remove(quadletSourceFile.Name())
 
 	fieldsByGroup, err := parseQuadletSourceFile(quadletSourceFile, lookupFuncs)
 	if err != nil {
-		exit(fmt.Errorf("could not parse quadlet source file: %s", err))
+		exit(fmt.Errorf("could not parse quadlet source file: %w", err))
 	}
 
 	data := sourceFileData{fieldsByGroup: fieldsByGroup, lookupFuncs: lookupFuncs}
 	err = generateSourceFiles(data)
 	if err != nil {
-		exit(fmt.Errorf("could not generate source files: %s", err))
+		exit(fmt.Errorf("could not generate source files: %w", err))
 	}
 }
 
@@ -87,7 +89,7 @@ func downloadSourceFileFromGithub(location string, version string) (*os.File, er
 
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to download from '%s': %v", url, err)
+		return nil, fmt.Errorf("failed to download from '%s': %w", url, err)
 	}
 	defer response.Body.Close()
 
@@ -97,13 +99,13 @@ func downloadSourceFileFromGithub(location string, version string) (*os.File, er
 
 	file, err := os.CreateTemp("", "quadlet-*.go")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary file to copy the content of quadlet file: %v", err)
+		return nil, fmt.Errorf("failed to create temporary file to copy the content of quadlet file: %w", err)
 	}
 	defer file.Close()
 
 	_, err = io.Copy(file, response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to copy file contents: %v", err)
+		return nil, fmt.Errorf("failed to copy file contents: %w", err)
 	}
 
 	return file, nil

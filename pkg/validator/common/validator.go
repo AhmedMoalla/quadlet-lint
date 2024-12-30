@@ -42,7 +42,6 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 				validationErrors = append(validationErrors, *V.Err(v.Name(), V.EmptyValue, key.Line, 0,
 					fmt.Sprintf("key '%s' in group '%s' has an empty value", key.Key, group)))
 			}
-
 		}
 	}
 	return validationErrors
