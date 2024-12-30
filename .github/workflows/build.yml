@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '$GO_VERSION'
+          go-version: '${{ env.GO_VERSION }}'
 
       - name: Build quadlet-lint
         run: make build
@@ -35,7 +35,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '$GO_VERSION'
+          go-version: '${{ env.GO_VERSION }}'
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
