@@ -1,9 +1,11 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build lint test
+.PHONY: generate build lint test
 
-build:
+generate:
 	go generate -v ./...
+
+build: generate
 	mkdir -p bin
 	go build -v -o bin ./cmd/quadlet-lint
 
