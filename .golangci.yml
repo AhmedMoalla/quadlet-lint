@@ -16,6 +16,10 @@ linters:
     - err113
     - gci
     - forbidigo
+    - gocognit
+    - gocyclo
+    - cyclop
+    - maintidx
 linters-settings:
   staticcheck:
     checks:

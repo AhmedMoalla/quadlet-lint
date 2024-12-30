@@ -64,7 +64,7 @@ func isValidUnicode(c uint32) bool {
 // This is based on code from systemd (src/basic/escape.c), marked LGPL-2.1-or-later and is copyrighted
 // by the systemd developers
 //
-//nolint:gosec,funlen,gocognit
+//nolint:gosec,funlen
 func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 	var count = 1
 	var eightBit = false
