@@ -1,7 +1,6 @@
 package quadlet
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"unicode"
@@ -19,8 +18,8 @@ var NetworkFormat = R.Format{
 	Name: "Network", ValueSeparator: ":", OptionsSeparator: ",",
 	ValidateOptions: func(value string, options map[string]string) error {
 		if strings.HasSuffix(value, P.UnitTypeContainer.Ext) && len(options) > 0 {
-			return errors.New(fmt.Sprintf("'%s' is invalid because extra options are not supported when "+
-				"joining another container's network", value))
+			return fmt.Errorf("'%s' is invalid because extra options are not supported when "+
+				"joining another container's network", value)
 		}
 		return nil
 	},

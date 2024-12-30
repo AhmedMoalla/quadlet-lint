@@ -192,10 +192,6 @@ func (l *unitLine) isKey(key string) bool {
 	return l.key == key
 }
 
-func (l *unitLine) isEmpty() bool {
-	return len(l.value.Value) == 0
-}
-
 func newUnitGroup(name string) *unitGroup {
 	g := &unitGroup{
 		name:  name,

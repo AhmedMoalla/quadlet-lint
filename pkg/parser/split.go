@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"unicode"
 )
@@ -11,15 +11,24 @@ import (
 type SplitFlags = uint64
 
 const (
-	SplitRelax                  SplitFlags = 1 << iota // Allow unbalanced quote and eat up trailing backslash.
-	SplitCUnescape                                     // Unescape known escape sequences.
-	SplitUnescapeRelax                                 // Allow and keep unknown escape sequences, allow and keep trailing backslash.
-	SplitUnescapeSeparators                            // Unescape separators (those specified, or whitespace by default).
-	SplitKeepQuote                                     // Ignore separators in quoting with "" and ''.
-	SplitUnquote                                       // Ignore separators in quoting with "" and '', and remove the quotes.
-	SplitDontCoalesceSeparators                        // Don't treat multiple adjacent separators as one
-	SplitRetainEscape                                  // Treat escape character '\' as any other character without special meaning
-	SplitRetainSeparators                              // Do not advance the original string pointer past the separator(s) */
+	// SplitRelax Allow unbalanced quote and eat up trailing backslash.
+	SplitRelax SplitFlags = 1 << iota
+	// SplitCUnescape Unescape known escape sequences.
+	SplitCUnescape
+	// SplitUnescapeRelax Allow and keep unknown escape sequences, allow and keep trailing backslash.
+	SplitUnescapeRelax
+	// SplitUnescapeSeparators Unescape separators (those specified, or whitespace by default).
+	SplitUnescapeSeparators
+	// SplitKeepQuote Ignore separators in quoting with "" and ''.
+	SplitKeepQuote
+	// SplitUnquote Ignore separators in quoting with "" and '', and remove the quotes.
+	SplitUnquote
+	// SplitDontCoalesceSeparators Don't treat multiple adjacent separators as one
+	SplitDontCoalesceSeparators
+	// SplitRetainEscape Treat escape character '\' as any other character without special meaning
+	SplitRetainEscape
+	// SplitRetainSeparators Do not advance the original string pointer past the separator(s) */
+	SplitRetainSeparators
 )
 
 const WhitespaceSeparators = " \t\n\r"
@@ -52,8 +61,10 @@ func isValidUnicode(c uint32) bool {
 	return c <= unicode.MaxRune
 }
 
-/* This is based on code from systemd (src/basic/escape.c), marked LGPL-2.1-or-later and is copyrighted by the systemd developers */
-
+// This is based on code from systemd (src/basic/escape.c), marked LGPL-2.1-or-later and is copyrighted
+// by the systemd developers
+//
+//nolint:gosec,funlen,gocognit
 func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 	var count = 1
 	var eightBit = false
@@ -220,9 +231,18 @@ func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 	return count, ret, eightBit
 }
 
-/* This is based on code from systemd (src/basic/extract-workd.c), marked LGPL-2.1-or-later and is copyrighted by the systemd developers */
+// This is based on code from systemd (src/basic/extract-workd.c), marked LGPL-2.1-or-later
+// and is copyrighted by the systemd developers
+
+var (
+	errUnbalancedQuotes      = errors.New("unbalanced quotes")
+	errUnsupportedEscapeChar = errors.New("unsupported escape char")
+	errUnbalancedEscape      = errors.New("unbalanced escape")
+)
 
 // Returns: word, remaining, more-words, error
+//
+//nolint:funlen
 func extractFirstWord(in string, separators string, flags SplitFlags) (string, string, bool, error) {
 	var s strings.Builder
 	var quote byte     // 0 or ' or "
@@ -293,7 +313,7 @@ loop1:
 				if flags&SplitRelax != 0 {
 					goto finishForceTerminate
 				}
-				return "", "", false, fmt.Errorf("unbalanced escape")
+				return "", "", false, errUnbalancedEscape
 			}
 
 			if flags&(SplitCUnescape|SplitUnescapeSeparators) != 0 {
@@ -316,7 +336,7 @@ loop1:
 					s.WriteByte('\\')
 					s.WriteByte(c)
 				default:
-					return "", "", false, fmt.Errorf("unsupported escape char")
+					return "", "", false, errUnsupportedEscapeChar
 				}
 			} else {
 				s.WriteByte(c)
@@ -332,7 +352,7 @@ loop1:
 					if flags&SplitRelax != 0 {
 						goto finishForceTerminate
 					}
-					return "", "", false, fmt.Errorf("unbalanced quotes")
+					return "", "", false, errUnbalancedQuotes
 				case c == quote:
 					/* found the end quote */
 					quote = 0
