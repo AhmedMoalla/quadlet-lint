@@ -7,6 +7,8 @@ import (
 )
 
 func TestSplitValueAppend(t *testing.T) {
+	t.Parallel()
+
 	values := make([]UnitValue, 0)
 	value := UnitValue{
 		Key:    "TestKey",

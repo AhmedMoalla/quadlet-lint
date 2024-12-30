@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const generatedFilesPerm = 0777
+
 func generateSourceFiles(data sourceFileData) error {
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -16,7 +18,7 @@ func generateSourceFiles(data sourceFileData) error {
 	}
 
 	outputDir := filepath.Join(workingDir, "generated")
-	err = os.Mkdir(outputDir, 0777)
+	err = os.Mkdir(outputDir, generatedFilesPerm)
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
@@ -49,7 +51,7 @@ func generateFile(outputDir string, data sourceFileData, filename string, genera
 	dir, filename := filepath.Split(filename)
 	fileDir := filepath.Join(outputDir, dir)
 	if len(dir) > 0 {
-		err := os.MkdirAll(fileDir, 0777)
+		err := os.MkdirAll(fileDir, generatedFilesPerm)
 		if err != nil && !os.IsExist(err) {
 			return err
 		}

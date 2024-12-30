@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	debug           = flag.Bool("debug", false, "Print debug logs")
 	checkReferences = flag.Bool("check-references", false, "Check references to other Quadlet files")
 )
 

@@ -1,0 +1,26 @@
+linters:
+  enable-all: true
+  disable:
+    - exportloopref
+    - gofumpt
+    - wsl
+    - wrapcheck
+    - varnamelen
+    - testpackage
+    - ireturn
+    - nlreturn
+    - gochecknoglobals
+    - exhaustruct
+    - godot
+    - depguard
+linters-settings:
+  staticcheck:
+    checks:
+      - '-SA4004'
+  mnd:
+    ignored-files:
+      - pkg/parser/split.go
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true

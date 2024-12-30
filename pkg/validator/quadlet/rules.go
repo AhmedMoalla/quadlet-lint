@@ -80,6 +80,8 @@ func isUnambiguousName(imageName string) bool {
 	return false
 }
 
+const hexImageLength = 64
+
 func isImageID(imageName string) bool {
 	// All sha25:... names are assumed by podman to be fully specified
 	if strings.HasPrefix(imageName, "sha256:") {
@@ -88,7 +90,7 @@ func isImageID(imageName string) bool {
 
 	// However, podman also accepts image ids as pure hex strings,
 	// but only those of length 64 are unambiguous image ids
-	if len(imageName) != 64 {
+	if len(imageName) != hexImageLength {
 		return false
 	}
 

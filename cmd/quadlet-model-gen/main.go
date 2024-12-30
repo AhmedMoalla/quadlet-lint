@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -79,8 +80,12 @@ func downloadSourceFileFromGithub(location string, version string) (*os.File, er
 	}
 
 	url := fmt.Sprintf(location, version)
-	client := http.Client{}
-	response, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download from '%s': %v", url, err)
 	}
