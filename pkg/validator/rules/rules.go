@@ -40,7 +40,7 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.Valida
 
 			fieldName := fieldType.Name
 
-			ruleFns := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
+			ruleFns, _ := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
 			for _, rule := range ruleFns {
 				field, ok := Fields[groupName][fieldName]
 				if !ok {
@@ -233,20 +233,23 @@ func MatchRegexp(regex *regexp.Regexp) V.Rule {
 
 func ValuesMust(valuesPredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) V.Rule {
 	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
-		if rulePredicate(validator, unit, field) {
-			if res, ok := unit.Lookup(field); ok {
-				if err := valuesPredicate(validator, field, res.Values); err != nil {
-					errorMsg := buildErrorMessage(messageAndArgs, err)
-					var line, column int
-					if len(res.Values) > 0 {
-						firstValue := res.Values[0]
-						line = firstValue.Line
-						column = firstValue.Column
-					}
-					return ErrSlice(validator.Name(), V.InvalidValue, line, column, errorMsg)
+		if !rulePredicate(validator, unit, field) {
+			return nil
+		}
+
+		if res, ok := unit.Lookup(field); ok {
+			if err := valuesPredicate(validator, field, res.Values); err != nil {
+				errorMsg := buildErrorMessage(messageAndArgs, err)
+				var line, column int
+				if len(res.Values) > 0 {
+					firstValue := res.Values[0]
+					line = firstValue.Line
+					column = firstValue.Column
 				}
+				return ErrSlice(validator.Name(), V.InvalidValue, line, column, errorMsg)
 			}
 		}
+
 		return nil
 	}
 }

@@ -81,6 +81,8 @@ func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error)
 }
 
 // TODO: This is bad. Refactor.
+//
+//nolint:all
 func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
 	parsed, err := parser.ParseFile(token.NewFileSet(), file.Name(), nil, parser.SkipObjectResolution)
 	if err != nil {
@@ -99,12 +101,12 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 
 		if decl.Tok == token.CONST {
 			for _, spec := range decl.Specs {
-				spec := spec.(*ast.ValueSpec)
+				spec, _ := spec.(*ast.ValueSpec)
 				name := spec.Names[0].Name
 				if len(spec.Values) != 1 {
 					continue
 				}
-				value := spec.Values[0].(*ast.BasicLit)
+				value, _ := spec.Values[0].(*ast.BasicLit)
 				if value.Kind == token.STRING {
 					constants[name] = strings.ReplaceAll(value.Value, "\"", "")
 				}
@@ -113,7 +115,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 
 		// Extract the group names from the ...Group const values like ContainerGroup, NetworkGroup, etc.
 		for _, spec := range decl.Specs {
-			spec := spec.(*ast.ValueSpec)
+			spec, _ := spec.(*ast.ValueSpec)
 			if group, groupVar, ok := getGroupName(spec); ok {
 				groups[group] = make([]field, 0, nbKeysPerGroup)
 				groupNameByGroupVarName[groupVar] = group
@@ -122,7 +124,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 
 		// Extract the key variable names from the Key... const values like KeyImage, KeyExec, etc.
 		for _, spec := range decl.Specs {
-			spec := spec.(*ast.ValueSpec)
+			spec, _ := spec.(*ast.ValueSpec)
 			if keyVar, keyName, ok := getKeyVarName(spec); ok {
 				keyNameByKeyVarName[keyVar] = keyName
 			}
@@ -137,7 +139,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 
 		// For every group, map the key variable names with the key names
 		for _, spec := range decl.Specs {
-			spec := spec.(*ast.ValueSpec)
+			spec, _ := spec.(*ast.ValueSpec)
 			if group, fields, ok := getGroupFields(spec, keyNameByKeyVarName); ok {
 				groups[group] = fields
 			}
@@ -290,8 +292,8 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 func getKeyVarName(spec *ast.ValueSpec) (string, string, bool) {
 	keyVar := spec.Names[0].Name
 	if strings.HasPrefix(keyVar, "Key") && len(spec.Values) == 1 {
-		value := spec.Values[0].(*ast.BasicLit)
-		if value.Kind != token.STRING {
+		value, ok := spec.Values[0].(*ast.BasicLit)
+		if !ok || value.Kind != token.STRING {
 			return "", "", false
 		}
 
@@ -308,11 +310,11 @@ func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) 
 		return "", nil, false
 	}
 
-	value := spec.Values[0].(*ast.CompositeLit)
+	value, _ := spec.Values[0].(*ast.CompositeLit)
 	fields := make([]field, 0, len(value.Elts))
 	for _, elt := range value.Elts {
-		kv := elt.(*ast.KeyValueExpr)
-		keyVarName := kv.Key.(*ast.Ident)
+		kv, _ := elt.(*ast.KeyValueExpr)
+		keyVarName, _ := kv.Key.(*ast.Ident)
 		if keyName, ok := keyNameByKeyVarName[keyVarName.Name]; ok {
 			fields = append(fields, field{Group: group, Key: keyName})
 		}
@@ -329,7 +331,7 @@ func getGroupName(spec *ast.ValueSpec) (string, string, bool) {
 		!strings.HasPrefix(groupVarName, "X") &&
 		!strings.HasPrefix(groupVarName, "Key") &&
 		len(spec.Values) == 1 {
-		value := spec.Values[0].(*ast.BasicLit)
+		value, _ := spec.Values[0].(*ast.BasicLit)
 		if value.Kind != token.STRING {
 			return "", groupVarName, false
 		}

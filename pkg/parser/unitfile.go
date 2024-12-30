@@ -106,44 +106,52 @@ func multiResult(values []UnitValue) (LookupResult, bool) {
 
 func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
 	if field.Multiple() {
-		var vals []UnitValue
-		switch field.LookupFunc {
-		case lookup.LookupAll:
-			vals = f.lookupAll(field)
-		case lookup.LookupAllRaw:
-			vals = f.lookupAllRaw(field)
-		case lookup.LookupAllStrv:
-			vals = f.lookupAllStrv(field)
-		case lookup.LookupAllArgs:
-			vals = f.lookupAllArgs(field)
-		case lookup.LookupAllKeyVal:
-			vals = f.lookupAllKeyVal(field)
-		case lookup.LookupLastArgs:
-			vals, _ = f.lookupLastArgs(field)
-		default:
-			panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
-				field.LookupFunc.Name, field.Key))
-		}
-		return multiResult(vals)
+		return f.lookupMultiple(field)
 	} else {
-		var val UnitValue
-		var ok bool
-		switch field.LookupFunc {
-		case lookup.Lookup:
-			val, ok = f.lookupBase(field)
-		case lookup.LookupLast:
-			val, ok = f.lookupLast(field)
-		case lookup.LookupLastRaw:
-			val, ok = f.lookupLastRaw(field)
-		case lookup.LookupBoolean, lookup.LookupBooleanWithDefault:
-			val, ok = f.lookupBoolean(field)
-		case lookup.LookupInt, lookup.LookupUint32:
-			val, ok = f.lookupInt(field)
-		default:
-			panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
-		}
-		return singleResult(val), ok
+		return f.lookupSingle(field)
 	}
+}
+
+func (f *UnitFile) lookupSingle(field model.Field) (LookupResult, bool) {
+	var val UnitValue
+	var ok bool
+	switch field.LookupFunc {
+	case lookup.Lookup:
+		val, ok = f.lookupBase(field)
+	case lookup.LookupLast:
+		val, ok = f.lookupLast(field)
+	case lookup.LookupLastRaw:
+		val, ok = f.lookupLastRaw(field)
+	case lookup.LookupBoolean, lookup.LookupBooleanWithDefault:
+		val, ok = f.lookupBoolean(field)
+	case lookup.LookupInt, lookup.LookupUint32:
+		val, ok = f.lookupInt(field)
+	default:
+		panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
+	}
+	return singleResult(val), ok
+}
+
+func (f *UnitFile) lookupMultiple(field model.Field) (LookupResult, bool) {
+	var vals []UnitValue
+	switch field.LookupFunc {
+	case lookup.LookupAll:
+		vals = f.lookupAll(field)
+	case lookup.LookupAllRaw:
+		vals = f.lookupAllRaw(field)
+	case lookup.LookupAllStrv:
+		vals = f.lookupAllStrv(field)
+	case lookup.LookupAllArgs:
+		vals = f.lookupAllArgs(field)
+	case lookup.LookupAllKeyVal:
+		vals = f.lookupAllKeyVal(field)
+	case lookup.LookupLastArgs:
+		vals = f.lookupLastArgs(field)
+	default:
+		panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
+			field.LookupFunc.Name, field.Key))
+	}
+	return multiResult(vals)
 }
 
 type UnitFileParser struct {
@@ -706,15 +714,15 @@ func (f *UnitFile) lookupAllArgs(field model.Field) []UnitValue {
 // array of words. The split code is exec-like, and both unquotes and
 // applied c-style c escapes.  This is typically used for keys like
 // ExecStart
-func (f *UnitFile) lookupLastArgs(field model.Field) ([]UnitValue, bool) {
+func (f *UnitFile) lookupLastArgs(field model.Field) []UnitValue {
 	execKey, ok := f.lookupLast(field)
 	if ok {
 		execArgs, err := splitString(execKey, WhitespaceSeparators, SplitRelax|SplitUnquote|SplitCUnescape)
 		if err == nil {
-			return execArgs, true
+			return execArgs
 		}
 	}
-	return nil, false
+	return nil
 }
 
 // Look up 'Environment' style key-value keys
