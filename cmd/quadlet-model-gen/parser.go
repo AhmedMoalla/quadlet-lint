@@ -25,6 +25,14 @@ var alternativeLookupMethods = map[string]string{
 	"lookupAndAddBoolean":    "LookupBoolean",
 }
 
+// Approximate number of elements present in the source files
+const (
+	nbGroups          = 11
+	nbConstants       = 150
+	nbKeysPerGroup    = 50
+	nbLookupFunctions = 15
+)
+
 type sourceFileData struct {
 	fieldsByGroup map[string][]field
 	lookupFuncs   map[string]lookupFunc
@@ -47,7 +55,7 @@ func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error)
 		return nil, err
 	}
 
-	lookupFuncs := make(map[string]lookupFunc, 15)
+	lookupFuncs := make(map[string]lookupFunc, nbLookupFunctions)
 	for _, decl := range parsed.Decls {
 		decl, ok := decl.(*ast.FuncDecl)
 		if !ok || !strings.HasPrefix(decl.Name.Name, "Lookup") {
@@ -79,10 +87,10 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 		return nil, err
 	}
 
-	constants := make(map[string]string, 150)
-	groups := make(map[string][]field, 11) // The number of groups declared in the file
+	constants := make(map[string]string, nbConstants)
+	groups := make(map[string][]field, nbGroups) // The number of groups declared in the file
 	groupNameByGroupVarName := make(map[string]string, len(groups))
-	keyNameByKeyVarName := make(map[string]string, 50)
+	keyNameByKeyVarName := make(map[string]string, nbKeysPerGroup)
 	for _, decl := range parsed.Decls {
 		decl, ok := decl.(*ast.GenDecl)
 		if !ok || (decl.Tok != token.VAR && decl.Tok != token.CONST) {
@@ -107,7 +115,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 		for _, spec := range decl.Specs {
 			spec := spec.(*ast.ValueSpec)
 			if group, groupVar, ok := getGroupName(spec); ok {
-				groups[group] = make([]field, 0, 50)
+				groups[group] = make([]field, 0, nbKeysPerGroup)
 				groupNameByGroupVarName[groupVar] = group
 			}
 		}
@@ -201,6 +209,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 							if groups[group][i].Key == key {
 								groups[group][i].LookupFunc = lookupFunc
 								found = true
+
 								break
 							}
 						}
@@ -217,6 +226,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 							for i := range fields {
 								if fields[i].Key == key {
 									fields[i].LookupFunc = lookupFunc
+
 									break
 								}
 							}
@@ -232,8 +242,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 							group := groupNameByGroupVarName[groupVarName]
 							keysVarName := expr.Args[2].(*ast.Ident).Name
 							ast.Inspect(parentFunctions[expr], func(n ast.Node) bool {
-								switch assign := n.(type) {
-								case *ast.AssignStmt:
+								if assign, ok := n.(*ast.AssignStmt); ok {
 									if len(assign.Lhs) == 1 && len(assign.Rhs) == 1 {
 										if ident, ok := assign.Lhs[0].(*ast.Ident); ok && ident.Name == keysVarName {
 											if composite, ok := assign.Rhs[0].(*ast.CompositeLit); ok {
@@ -276,15 +285,17 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	return groups, nil
 }
 
-func getKeyVarName(spec *ast.ValueSpec) (keyVar string, keyName string, isKeyVar bool) {
-	keyVar = spec.Names[0].Name
+// getKeyVarName extracts the key name and the variable containing the key name from the constant declaration
+// passed to the function
+func getKeyVarName(spec *ast.ValueSpec) (string, string, bool) {
+	keyVar := spec.Names[0].Name
 	if strings.HasPrefix(keyVar, "Key") && len(spec.Values) == 1 {
 		value := spec.Values[0].(*ast.BasicLit)
 		if value.Kind != token.STRING {
 			return "", "", false
 		}
 
-		return keyVar, strings.Replace(value.Value, "\"", "", 2), true
+		return keyVar, strings.ReplaceAll(value.Value, "\"", ""), true
 	}
 
 	return "", "", false
@@ -309,8 +320,10 @@ func getGroupFields(spec *ast.ValueSpec, keyNameByKeyVarName map[string]string) 
 	return group, fields, true
 }
 
-func getGroupName(spec *ast.ValueSpec) (groupName string, groupVarName string, isGroupDecl bool) {
-	groupVarName = spec.Names[0].Name
+// getGroupName extracts the group name and the variable containing the group name from the constant declaration
+// passed to the function
+func getGroupName(spec *ast.ValueSpec) (string, string, bool) {
+	groupVarName := spec.Names[0].Name
 	if strings.HasSuffix(groupVarName, "Group") &&
 		!strings.HasPrefix(groupVarName, "X") &&
 		!strings.HasPrefix(groupVarName, "Key") &&
@@ -320,7 +333,7 @@ func getGroupName(spec *ast.ValueSpec) (groupName string, groupVarName string, i
 			return "", groupVarName, false
 		}
 
-		return strings.Replace(value.Value, "\"", "", 2), groupVarName, true
+		return strings.ReplaceAll(value.Value, "\"", ""), groupVarName, true
 	}
 
 	return "", groupVarName, false

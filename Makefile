@@ -1,15 +1,15 @@
 .DEFAULT_GOAL := build
 
-.PHONY: fmt generate build
+.PHONY: build lint test
 
-fmt:
-	go fmt ./...
-	go run golang.org/x/tools/cmd/goimports@latest -local 'github.com/AhmedMoalla/quadlet-lint' -w .
-
-generate: fmt
+build:
 	go generate -v ./...
-
-build: generate
-	go vet ./...
 	mkdir -p bin
 	go build -v -o bin ./cmd/quadlet-lint
+
+# TODO Add coverage reporting
+test:
+	go test ./...
+
+lint:
+	golangci-lint run

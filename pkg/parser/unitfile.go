@@ -174,10 +174,10 @@ func newParsingErrorAtLine(line int, message string) *ParsingError {
 
 func (e *ParsingError) Error() string {
 	if e.inner != nil {
-		return fmt.Sprintf("%s", e.inner.Error())
+		return e.inner.Error()
 	}
 
-	return fmt.Sprintf("%s", e.message)
+	return e.message
 }
 
 func newUnitLine(key string, value UnitValue) *unitLine {
@@ -206,11 +206,6 @@ func newUnitGroup(name string) *unitGroup {
 
 func (g *unitGroup) addLine(line *unitLine) {
 	g.lines = append(g.lines, line)
-}
-
-func (g *unitGroup) prependLine(line *unitLine) {
-	n := []*unitLine{line}
-	g.lines = append(n, g.lines...)
 }
 
 func (g *unitGroup) add(key string, value UnitValue) {
@@ -316,7 +311,8 @@ func lineIsKeyValuePair(line string) bool {
 	return true
 }
 
-func groupNameIsValid(name string) (valid bool, badCharacterIndex int) {
+// groupNameIsValid checks if a group's name is valid and returns the position where the group name is invalid
+func groupNameIsValid(name string) (bool, int) {
 	if len(name) == 0 {
 		return false, 0
 	}
@@ -330,7 +326,8 @@ func groupNameIsValid(name string) (valid bool, badCharacterIndex int) {
 	return true, -1
 }
 
-func keyNameIsValid(name string) (valid bool, badCharacterIndex int) {
+// keyNameIsValid checks if a key's name is valid and returns the position where the key name is invalid
+func keyNameIsValid(name string) (bool, int) {
 	if len(name) == 0 {
 		return false, 0
 	}
@@ -359,7 +356,7 @@ func (p *UnitFileParser) parseGroup(line string) *ParsingError {
 	groupName := line[1:end]
 
 	if valid, badIndex := groupNameIsValid(groupName); !valid {
-		return newParsingError(p.lineNr, badIndex+1, fmt.Sprintf("invalid group name: %s", groupName))
+		return newParsingError(p.lineNr, badIndex+1, "invalid group name: "+groupName)
 	}
 
 	p.currentGroup = p.file.ensureGroup(groupName)
@@ -381,7 +378,7 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	}
 	key := line[:keyEnd]
 	if valid, badIndex := keyNameIsValid(key); !valid {
-		return newParsingError(p.lineNr, badIndex, fmt.Sprintf("invalid key name: %s", key))
+		return newParsingError(p.lineNr, badIndex, "invalid key name: "+key)
 	}
 
 	// Pull the value from the line (chugging leading whitespace)
@@ -597,7 +594,7 @@ func (f *UnitFile) lookupBoolean(field model.Field) (UnitValue, bool) {
 	}, true
 }
 
-/* Mimics strol, which is what systemd uses */
+/* Mimics strol, which is what systemd uses. */
 func convertNumber(v string) (int64, error) {
 	var err error
 	var intVal int64

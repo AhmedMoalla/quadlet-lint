@@ -253,10 +253,13 @@ func ValuesMust(valuesPredicate ValuesValidator, rulePredicate RulePredicate, me
 
 func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 	var errorMsg string
-	if len(messageAndArgs) == 1 {
-		errorMsg = messageAndArgs[0].(string)
-	} else if len(messageAndArgs) > 1 {
-		errorMsg = fmt.Sprintf(messageAndArgs[0].(string), messageAndArgs[1:]...)
+	if len(messageAndArgs) >= 1 {
+		if msg, ok := messageAndArgs[0].(string); ok {
+			errorMsg = msg
+			if len(messageAndArgs) > 1 {
+				errorMsg = fmt.Sprintf(errorMsg, messageAndArgs[1:]...)
+			}
+		}
 	}
 
 	if len(errorMsg) > 0 {

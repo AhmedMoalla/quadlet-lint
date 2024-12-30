@@ -124,7 +124,7 @@ func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 		}
 
 		var a [4]int
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			a[i] = unhexchar(p[1+i])
 			if a[i] < 0 {
 				return -1, 0, false
@@ -148,7 +148,7 @@ func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 		}
 
 		var a [8]int
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			a[i] = unhexchar(p[1+i])
 			if a[i] < 0 {
 				return -10, 0, false
@@ -440,74 +440,4 @@ func splitValueAppend(appendTo []UnitValue, u UnitValue, separators string, flag
 
 func splitString(s UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
 	return splitValueAppend(make([]UnitValue, 0), s, separators, flags)
-}
-
-func charNeedEscape(c rune, isPath bool) bool {
-	if c > 128 {
-		return false /* unicode is ok */
-	}
-
-	pathRune := (isPath && c == '-') ||
-		(isPath && c == '/')
-
-	return unicode.IsSpace(c) ||
-		unicode.IsControl(c) ||
-		pathRune ||
-		c == '"' ||
-		c == '\'' ||
-		c == '\\'
-}
-
-func wordNeedEscape(word string) bool {
-	for _, c := range word {
-		if charNeedEscape(c, false) {
-			return true
-		}
-	}
-	return false
-}
-
-func appendEscapeWord(escaped *strings.Builder, word string) {
-	escaped.WriteRune('"')
-	escapeString(escaped, word, false)
-	escaped.WriteRune('"')
-}
-
-func escapeString(escaped *strings.Builder, word string, isPath bool) {
-	for i, c := range word {
-		if charNeedEscape(c, isPath) {
-			switch c {
-			case '\a':
-				escaped.WriteString("\\a")
-			case '\b':
-				escaped.WriteString("\\b")
-			case '\n':
-				escaped.WriteString("\\n")
-			case '\r':
-				escaped.WriteString("\\r")
-			case '\t':
-				escaped.WriteString("\\t")
-			case '\v':
-				escaped.WriteString("\\v")
-			case '\f':
-				escaped.WriteString("\\f")
-			case '\\':
-				escaped.WriteString("\\\\")
-			case ' ':
-				escaped.WriteString(" ")
-			case '"':
-				escaped.WriteString("\\\"")
-			case '\'':
-				escaped.WriteString("'")
-			case '/':
-				if isPath && i != 0 {
-					escaped.WriteString("-")
-				}
-			default:
-				escaped.WriteString(fmt.Sprintf("\\x%.2x", c))
-			}
-		} else {
-			escaped.WriteRune(c)
-		}
-	}
 }
