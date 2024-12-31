@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -80,10 +82,82 @@ func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error)
 	return lookupFuncs, nil
 }
 
+type inspectionResult struct {
+	constants         map[string]string
+	supportedKeysMaps map[string]string
+}
+
+func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
+	parsed, err := parser.ParseFile(token.NewFileSet(), file.Name(), nil, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make(map[string][]field, nbGroups)
+	result := inspectQuadletSourceFile(parsed)
+	fmt.Println(result)
+
+	return groups, nil
+}
+
+func inspectQuadletSourceFile(parsed *ast.File) inspectionResult {
+	result := inspectionResult{
+		constants:         make(map[string]string),
+		supportedKeysMaps: make(map[string]string),
+	}
+
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		switch decl := n.(type) {
+		case *ast.GenDecl:
+			switch decl.Tok {
+			case token.CONST:
+				fmt.Printf("%#v\n", decl)
+				for _, spec := range decl.Specs {
+					spec, ok := spec.(*ast.ValueSpec)
+					if !ok {
+						panic(fmt.Sprintf("quadlet.go should only have constants of type *ast.ValueSpec. "+
+							"Spec %s is of type %T. The parser likely needs to be updated", spec.Names, spec))
+					}
+
+					if len(spec.Names) != 1 {
+						panic(fmt.Sprintf("quadlet.go should only have constants that have a single name. "+
+							"Spec %s has %d names", spec.Names, len(spec.Names)))
+					}
+					name := spec.Names[0].Name
+
+					if len(spec.Values) != 1 {
+						panic(fmt.Sprintf("quadlet.go should only have constants that have a single value. "+
+							"Spec %s has %d values", name, len(spec.Values)))
+					}
+
+					value, ok := spec.Values[0].(*ast.BasicLit)
+					if !ok || value.Kind != token.STRING {
+						panic(fmt.Sprintf("quadlet.go should only have constants that have string literal values. "+
+							"Spec %s is of kind %s and of type %T", name, value.Kind.String(), spec.Values[0]))
+					}
+
+					unquoted, err := strconv.Unquote(value.Value)
+					if err != nil {
+						panic(fmt.Sprintf("syntax error while unquoting value %s of spec %s", value.Value, name))
+					}
+
+					result.constants[name] = unquoted
+				}
+			case token.VAR:
+			default:
+				return true
+			}
+		}
+		return true
+	})
+
+	return result
+}
+
 // TODO: This is bad. Refactor.
 //
 //nolint:all
-func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
+func parseQuadletSourceFile2(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
 	parsed, err := parser.ParseFile(token.NewFileSet(), file.Name(), nil, parser.SkipObjectResolution)
 	if err != nil {
 		return nil, err

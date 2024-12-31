@@ -55,7 +55,7 @@ type structInstance struct {
 	fields     map[string]any
 }
 
-type inspectionResult struct {
+type testInspectionResult struct {
 	structDecls []structDecl
 	variables   map[string]any
 }
@@ -75,13 +75,13 @@ func compareFiles(t *testing.T, generatedRefDir *os.File, generatedDir *os.File)
 	return nil
 }
 
-func inspectDir(t *testing.T, dir *os.File) (map[string]inspectionResult, error) {
+func inspectDir(t *testing.T, dir *os.File) (map[string]testInspectionResult, error) {
 	files, err := listAllFiles(dir.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]inspectionResult, len(files))
+	result := make(map[string]testInspectionResult, len(files))
 	for _, file := range files {
 		fileResult, err := inspectFile(t, file)
 		if err != nil {
@@ -95,13 +95,13 @@ func inspectDir(t *testing.T, dir *os.File) (map[string]inspectionResult, error)
 	return result, nil
 }
 
-func inspectFile(t *testing.T, file string) (inspectionResult, error) {
+func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
 	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
 	if err != nil {
-		return inspectionResult{}, err
+		return testInspectionResult{}, err
 	}
 
-	result := inspectionResult{
+	result := testInspectionResult{
 		structDecls: make([]structDecl, 0, 1),
 		variables:   make(map[string]any, 20),
 	}
