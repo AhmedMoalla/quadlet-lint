@@ -25,8 +25,11 @@ var (
 
 func main() {
 	flag.Parse()
+	runLinter(*podmanVersion)
+}
 
-	podmanVersion := getPodmanVersion(*podmanVersion)
+func runLinter(podmanVersion string) {
+	podmanVersion = getPodmanVersion(podmanVersion)
 	unitfileParserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, podmanVersion)
 	if err != nil {
 		exit(fmt.Errorf("could not download unitfile.go source file: %w", err))
