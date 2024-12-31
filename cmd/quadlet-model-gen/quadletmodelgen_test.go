@@ -5,9 +5,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"go/types"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -32,11 +39,194 @@ func TestQuadletModelGen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	compareFiles(generatedRefDir, generatedDir)
+	err = compareFiles(t, generatedRefDir, generatedDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
-func compareFiles(generatedRefDir *os.File, generatedDir *os.File) {
-	// TODO: Do comparison
+type structDecl struct {
+	name   string
+	fields map[string]string
+}
+
+type structInstance struct {
+	structType string
+	fields     map[string]any
+}
+
+type inspectionResult struct {
+	structDecls []structDecl
+	variables   map[string]any
+}
+
+func compareFiles(t *testing.T, generatedRefDir *os.File, generatedDir *os.File) error {
+	refResult, err := inspectDir(t, generatedRefDir)
+	if err != nil {
+		return err
+	}
+
+	result, err := inspectDir(t, generatedDir)
+	if err != nil {
+		return err
+	}
+
+	assert.Equal(t, refResult, result)
+	return nil
+}
+
+func inspectDir(t *testing.T, dir *os.File) (map[string]inspectionResult, error) {
+	files, err := listAllFiles(dir.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]inspectionResult, len(files))
+	for _, file := range files {
+		fileResult, err := inspectFile(t, file)
+		if err != nil {
+			return nil, err
+		}
+
+		_, filename := filepath.Split(file)
+		result[filename] = fileResult
+	}
+
+	return result, nil
+}
+
+func inspectFile(t *testing.T, file string) (inspectionResult, error) {
+	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
+	if err != nil {
+		return inspectionResult{}, err
+	}
+
+	result := inspectionResult{
+		structDecls: make([]structDecl, 0, 1),
+		variables:   make(map[string]any, 20),
+	}
+	ast.Inspect(parsed, func(n ast.Node) bool {
+		node, ok := n.(*ast.GenDecl)
+		if !ok {
+			return true
+		}
+
+		switch node.Tok {
+		case token.TYPE:
+			for _, spec := range node.Specs {
+				spec, _ := spec.(*ast.TypeSpec)
+				structType, ok := spec.Type.(*ast.StructType)
+				if !ok {
+					return false
+				}
+
+				fields := make(map[string]string, len(structType.Fields.List))
+				for _, field := range structType.Fields.List {
+					fields[field.Names[0].Name] = types.ExprString(field.Type)
+				}
+
+				result.structDecls = append(result.structDecls, structDecl{
+					name:   spec.Name.Name,
+					fields: fields,
+				})
+			}
+		case token.VAR:
+			for _, spec := range node.Specs {
+				valueSpec, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					t.Fatalf("inspection does not support VARs specs other then *ast.ValueSpec. Found %T", spec)
+				}
+
+				compositeSpec, ok := valueSpec.Values[0].(*ast.CompositeLit)
+				if !ok {
+					t.Fatalf("inspection does not support VARs value specs other then *ast.CompositeLit. Found %T", valueSpec.Values[0])
+				}
+
+				if _, ok := compositeSpec.Type.(*ast.MapType); ok {
+					mapValue := computeMapField(t, compositeSpec)
+					if mapValue != nil {
+						result.variables[valueSpec.Names[0].Name] = mapValue
+					}
+					return true
+				}
+
+				fields := make(map[string]any)
+				for _, elt := range compositeSpec.Elts {
+					kv, ok := elt.(*ast.KeyValueExpr)
+					if !ok {
+						t.Fatalf("inspection does not support VARs composite literal specs other then *ast.KeyValueExpr. Found %T", elt)
+					}
+
+					key, ok := kv.Key.(*ast.Ident)
+					if !ok {
+						t.Fatalf("expected key to be of type *ast.Ident. Found %T", kv.Key)
+					}
+
+					fields[key.Name] = types.ExprString(kv.Value)
+				}
+
+				result.variables[valueSpec.Names[0].Name] = structInstance{
+					structType: types.ExprString(compositeSpec.Type),
+					fields:     fields,
+				}
+			}
+		default:
+			return true
+		}
+
+		return true
+	})
+
+	return result, nil
+}
+
+// computeMapField can handle nested maps with string keys
+func computeMapField(t *testing.T, spec *ast.CompositeLit) any {
+	result := make(map[string]any, len(spec.Elts))
+	for _, elt := range spec.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			return nil
+		}
+
+		key, ok := kv.Key.(*ast.BasicLit)
+		if !ok {
+			return nil
+		}
+
+		if value, ok := kv.Value.(*ast.CompositeLit); ok {
+			result[key.Value] = computeMapField(t, value)
+		} else if value, ok := kv.Value.(*ast.SelectorExpr); ok {
+			result[key.Value] = types.ExprString(value)
+		} else {
+			return nil
+		}
+	}
+
+	return result
+}
+
+func listAllFiles(dir string) ([]string, error) {
+	dirEntries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]string, 0, len(dirEntries))
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
+			subDirFiles, err := listAllFiles(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				return nil, err
+			}
+
+			files = append(files, subDirFiles...)
+		} else {
+			files = append(files, filepath.Join(dir, entry.Name()))
+		}
+	}
+
+	return files, nil
 }
 
 func getPodmanVersionFromGeneratedComment() (string, error) {
