@@ -10,16 +10,18 @@ import (
 	"strings"
 )
 
-var groupByKeyMap = map[string]string{
-	"supportedContainerKeys": "Container",
-	"supportedVolumeKeys":    "Volume",
-	"supportedNetworkKeys":   "Network",
-	"supportedKubeKeys":      "Kube",
-	"supportedImageKeys":     "Image",
-	"supportedBuildKeys":     "Build",
-	"supportedPodKeys":       "Pod",
-	"supportedQuadletKeys":   "Quadlet",
+var keyMapByGroup = map[string]string{
+	"Container": "supportedContainerKeys",
+	"Volume":    "supportedVolumeKeys",
+	"Network":   "supportedNetworkKeys",
+	"Kube":      "supportedKubeKeys",
+	"Image":     "supportedImageKeys",
+	"Build":     "supportedBuildKeys",
+	"Pod":       "supportedPodKeys",
+	"Quadlet":   "supportedQuadletKeys",
 }
+
+var groupByKeyMap = reverseMap(keyMapByGroup)
 
 var alternativeLookupMethods = map[string]string{
 	"lookupAndAddString":     "Lookup",
@@ -83,8 +85,9 @@ func parseUnitFileParserSourceFile(file *os.File) (map[string]lookupFunc, error)
 }
 
 type inspectionResult struct {
-	constants         map[string]string
-	supportedKeysMaps map[string]string
+	keyConstants      map[string]string
+	groupConstants    map[string]string
+	supportedKeysMaps map[string][]string
 }
 
 func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
@@ -93,65 +96,140 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 		return nil, err
 	}
 
-	groups := make(map[string][]field, nbGroups)
 	result := inspectQuadletSourceFile(parsed)
-	fmt.Println(result)
-
-	return groups, nil
-}
-
-func inspectQuadletSourceFile(parsed *ast.File) inspectionResult {
-	result := inspectionResult{
-		constants:         make(map[string]string),
-		supportedKeysMaps: make(map[string]string),
+	fieldsByGroup := make(map[string][]field, len(result.groupConstants))
+	for _, group := range result.groupConstants {
+		keyMapName := keyMapByGroup[group]
+		for _, keyConstName := range result.supportedKeysMaps[keyMapName] {
+			key := result.keyConstants[keyConstName]
+			fieldsByGroup[group] = append(fieldsByGroup[group], field{
+				Group: group,
+				Key:   key,
+			})
+		}
 	}
 
-	ast.Inspect(parsed, func(n ast.Node) bool {
-		switch decl := n.(type) {
-		case *ast.GenDecl:
-			switch decl.Tok {
-			case token.CONST:
-				fmt.Printf("%#v\n", decl)
-				for _, spec := range decl.Specs {
-					spec, ok := spec.(*ast.ValueSpec)
-					if !ok {
-						panic(fmt.Sprintf("quadlet.go should only have constants of type *ast.ValueSpec. "+
-							"Spec %s is of type %T. The parser likely needs to be updated", spec.Names, spec))
-					}
+	return fieldsByGroup, nil
+}
 
-					if len(spec.Names) != 1 {
-						panic(fmt.Sprintf("quadlet.go should only have constants that have a single name. "+
-							"Spec %s has %d names", spec.Names, len(spec.Names)))
-					}
-					name := spec.Names[0].Name
+func inspectQuadletSourceFile(file *ast.File) inspectionResult {
+	result := inspectionResult{
+		groupConstants:    make(map[string]string, nbGroups),
+		keyConstants:      make(map[string]string, nbConstants),
+		supportedKeysMaps: make(map[string][]string, len(groupByKeyMap)),
+	}
 
-					if len(spec.Values) != 1 {
-						panic(fmt.Sprintf("quadlet.go should only have constants that have a single value. "+
-							"Spec %s has %d values", name, len(spec.Values)))
-					}
+	for _, decl := range file.Decls {
+		decl, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
 
-					value, ok := spec.Values[0].(*ast.BasicLit)
-					if !ok || value.Kind != token.STRING {
-						panic(fmt.Sprintf("quadlet.go should only have constants that have string literal values. "+
-							"Spec %s is of kind %s and of type %T", name, value.Kind.String(), spec.Values[0]))
-					}
-
-					unquoted, err := strconv.Unquote(value.Value)
-					if err != nil {
-						panic(fmt.Sprintf("syntax error while unquoting value %s of spec %s", value.Value, name))
-					}
-
-					result.constants[name] = unquoted
+		if decl.Tok == token.CONST {
+			for _, spec := range decl.Specs {
+				valueSpec, name := mustGetValueSpecName(spec)
+				if isKeyNameConst(name) {
+					value := mustExtractConstantValue(valueSpec, name)
+					result.keyConstants[name] = value
+				} else if isGroupNameConst(name) {
+					value := mustExtractConstantValue(valueSpec, name)
+					result.groupConstants[name] = value
 				}
-			case token.VAR:
-			default:
-				return true
 			}
 		}
-		return true
-	})
+
+		if decl.Tok == token.VAR {
+			for _, spec := range decl.Specs {
+				valueSpec, name := mustGetValueSpecName(spec)
+				if _, ok := groupByKeyMap[name]; !ok {
+					continue
+				}
+				keys := mustExtractSupportedKeysFromMap(valueSpec, name)
+				result.supportedKeysMaps[name] = keys
+			}
+		}
+	}
 
 	return result
+}
+
+func isKeyNameConst(name string) bool {
+	return strings.HasPrefix(name, "Key")
+}
+
+func isGroupNameConst(name string) bool {
+	return strings.HasSuffix(name, "Group") &&
+		!strings.HasPrefix(name, "X") &&
+		!strings.HasPrefix(name, "Key")
+}
+
+func mustExtractSupportedKeysFromMap(spec *ast.ValueSpec, name string) []string {
+	if len(spec.Values) != 1 {
+		panic(fmt.Sprintf("quadlet.go should only have constants that have a single value. "+
+			"Spec %s has %d values. The parser likely needs to be updated", name, len(spec.Values)))
+	}
+
+	value, ok := spec.Values[0].(*ast.CompositeLit)
+	_, isMap := value.Type.(*ast.MapType)
+	if !ok || !isMap {
+		panic(fmt.Sprintf("quadlet.go should only have variables defining maps of supported keys that have map literal values of type *ast.CompositeLit. "+
+			"Spec %s is of type %T with values of type %T. The parser likely needs to be updated", name, value.Type, spec.Values[0]))
+	}
+
+	keys := make([]string, 0, len(value.Elts))
+	for _, elt := range value.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			panic(fmt.Sprintf("quadlet.go should only have key-value composite literals should be of type *ast.KeyValueExpr. "+
+				"Spec %s has composite literal of type %T. The parser likely needs to be updated", name, elt))
+		}
+
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok {
+			panic(fmt.Sprintf("quadlet.go should only have keys of key-value composite literals that are of type *ast.Ident. "+
+				"Spec %s has key of type %T. The parser likely needs to be updated", name, kv.Key))
+		}
+
+		keys = append(keys, key.Name)
+	}
+
+	return keys
+}
+
+func mustExtractConstantValue(spec *ast.ValueSpec, name string) string {
+
+	if len(spec.Values) != 1 {
+		panic(fmt.Sprintf("quadlet.go should only have constants that have a single value. "+
+			"Spec %s has %d values. The parser likely needs to be updated", name, len(spec.Values)))
+	}
+
+	value, ok := spec.Values[0].(*ast.BasicLit)
+	if !ok || value.Kind != token.STRING {
+		panic(fmt.Sprintf("quadlet.go should only have constants that have string literal values. "+
+			"Spec %s is of kind %s and of type %T. The parser likely needs to be updated", name, value.Kind.String(), spec.Values[0]))
+	}
+
+	unquoted, err := strconv.Unquote(value.Value)
+	if err != nil {
+		panic(fmt.Sprintf("syntax error while unquoting value %s of valueSpec %s", value.Value, name))
+	}
+	return unquoted
+}
+
+func mustGetValueSpecName(spec ast.Spec) (*ast.ValueSpec, string) {
+	valueSpec, ok := spec.(*ast.ValueSpec)
+	if !ok {
+		panic(fmt.Sprintf("quadlet.go should only have constants of type *ast.ValueSpec. "+
+			"Spec %s is of type %T. The parser likely needs to be updated", valueSpec.Names, valueSpec))
+	}
+
+	if len(valueSpec.Names) != 1 {
+		panic(fmt.Sprintf("quadlet.go should only have constants that have a single name. "+
+			"Spec %s has %d names. The parser likely needs to be updated", valueSpec.Names, len(valueSpec.Names)))
+	}
+
+	name := valueSpec.Names[0].Name
+	return valueSpec, name
 }
 
 // TODO: This is bad. Refactor.
@@ -222,7 +300,6 @@ func parseQuadletSourceFile2(file *os.File, lookupFuncs map[string]lookupFunc) (
 
 	// Map to hold CallExpr and their enclosing functions
 	parentFunctions := make(map[*ast.CallExpr]*ast.FuncDecl)
-	funcDecls := make(map[string][]*ast.FuncDecl)
 	callExprs := make(map[string][]*ast.CallExpr)
 
 	var currentFunc *ast.FuncDecl
@@ -238,13 +315,7 @@ func parseQuadletSourceFile2(file *os.File, lookupFuncs map[string]lookupFunc) (
 				} else if sel, ok := node.Fun.(*ast.SelectorExpr); ok {
 					callName = sel.Sel.Name
 				}
-				funcName := currentFunc.Name.Name
-
 				parentFunctions[node] = currentFunc
-				if _, ok := funcDecls[funcName]; !ok {
-					funcDecls[funcName] = make([]*ast.FuncDecl, 0)
-				}
-				funcDecls[funcName] = append(funcDecls[funcName], currentFunc)
 
 				if _, ok := callExprs[callName]; !ok {
 					callExprs[callName] = make([]*ast.CallExpr, 0)
