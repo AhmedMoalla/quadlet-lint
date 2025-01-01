@@ -88,6 +88,17 @@ type inspectionResult struct {
 	keyConstants      map[string]string
 	groupConstants    map[string]string
 	supportedKeysMaps map[string][]string
+	lookupFuncByArgs  map[lookupFuncArgs]string
+}
+
+type lookupFuncArgs struct {
+	group string
+	key   lookupFuncKey
+}
+
+type lookupFuncKey struct {
+	value   string
+	literal bool
 }
 
 func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (map[string][]field, error) {
@@ -97,14 +108,34 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	}
 
 	result := inspectQuadletSourceFile(parsed)
-	fieldsByGroup := make(map[string][]field, len(result.groupConstants))
-	for _, group := range result.groupConstants {
+	keyConstants := result.keyConstants
+	groupConstants := result.groupConstants
+
+	fieldsByGroup := make(map[string][]field, len(groupConstants))
+
+	lookupFuncByGroupKey := make(map[string]map[string]lookupFunc, nbGroups)
+	for args, lookupFuncName := range result.lookupFuncByArgs {
+		group := groupConstants[args.group]
+		if !args.key.literal {
+			key := keyConstants[args.key.value]
+			lookupFuncByGroupKey[group][key] = lookupFuncs[lookupFuncName]
+		} else {
+			fieldsByGroup[group] = append(fieldsByGroup[group], field{
+				Group:      group,
+				Key:        args.key.value,
+				LookupFunc: lookupFuncs[lookupFuncName],
+			})
+		}
+	}
+
+	for _, group := range groupConstants {
 		keyMapName := keyMapByGroup[group]
 		for _, keyConstName := range result.supportedKeysMaps[keyMapName] {
-			key := result.keyConstants[keyConstName]
+			key := keyConstants[keyConstName]
 			fieldsByGroup[group] = append(fieldsByGroup[group], field{
-				Group: group,
-				Key:   key,
+				Group:      group,
+				Key:        key,
+				LookupFunc: lookupFuncByGroupKey[group][key],
 			})
 		}
 	}
@@ -117,6 +148,7 @@ func inspectQuadletSourceFile(file *ast.File) inspectionResult {
 		groupConstants:    make(map[string]string, nbGroups),
 		keyConstants:      make(map[string]string, nbConstants),
 		supportedKeysMaps: make(map[string][]string, len(groupByKeyMap)),
+		lookupFuncByArgs:  make(map[lookupFuncArgs]string),
 	}
 
 	for _, decl := range file.Decls {
