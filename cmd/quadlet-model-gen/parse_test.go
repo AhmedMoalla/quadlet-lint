@@ -11,10 +11,25 @@ func TestQuadletParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fields, err := parseQuadletSourceFile(file, nil)
+	parserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, "v5.3.1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("%#v\n", fields)
+	lookupFuncs, err := parseUnitFileParserSourceFile(parserFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fieldsByGroup, err := parseQuadletSourceFile(file, lookupFuncs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for group, fields := range fieldsByGroup {
+		fmt.Println(group)
+		for _, field := range fields {
+			fmt.Printf("\t%#v\n", field)
+		}
+	}
 }
