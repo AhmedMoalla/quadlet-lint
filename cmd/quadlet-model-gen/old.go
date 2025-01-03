@@ -157,7 +157,7 @@ func parseQuadletSourceFile2(file *os.File, lookupFuncs map[string]lookupFunc) (
 					}
 				}
 			case *ast.Ident:
-				if lookupFuncName, ok := alternativeLookupMethods[fun.Name]; ok {
+				if lookupFuncName, ok := alternativeLookupFuncs[fun.Name]; ok {
 					lookupFunc := lookupFuncs[lookupFuncName]
 					for _, expr := range callExprs[fun.Name] {
 						if expr.Pos() == fun.Pos() {
