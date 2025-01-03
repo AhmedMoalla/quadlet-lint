@@ -17,9 +17,9 @@ type declarations struct {
 }
 
 type lookupFuncCalls struct {
-	direct      map[lookupFuncArgs]string
-	ambiguous   map[lookupFuncArgs]string
-	alternative map[lookupFuncArgs]string
+	direct      map[lookupFuncArgs]lookupFunc
+	ambiguous   map[lookupFuncArgs]lookupFunc
+	alternative map[lookupFuncArgs]lookupFunc
 }
 
 type lookupFuncArgs struct {
@@ -30,6 +30,12 @@ type lookupFuncArgs struct {
 type lookupFuncKey struct {
 	name    string
 	literal bool
+}
+
+var alternativeLookupFuncs = map[string]string{
+	"lookupAndAddString":     "Lookup",
+	"lookupAndAddAllStrings": "LookupAll",
+	"lookupAndAddBoolean":    "LookupBoolean",
 }
 
 func inspectQuadletSourceFileDeclarations(file *ast.File) declarations {
@@ -75,78 +81,168 @@ func inspectQuadletSourceFileDeclarations(file *ast.File) declarations {
 	return result
 }
 
-func inspectQuadletSourceFileLookupFuncCalls(file *ast.File, declarations declarations, lookupFuncs map[string]lookupFunc) lookupFuncCalls {
+func inspectQuadletSourceFileLookupCalls(file *ast.File, declarations declarations, lookupFuncs map[string]lookupFunc) lookupFuncCalls {
 	calls := lookupFuncCalls{
-		direct:      make(map[lookupFuncArgs]string),
-		ambiguous:   make(map[lookupFuncArgs]string),
-		alternative: make(map[lookupFuncArgs]string),
+		direct:      make(map[lookupFuncArgs]lookupFunc),
+		ambiguous:   make(map[lookupFuncArgs]lookupFunc),
+		alternative: make(map[lookupFuncArgs]lookupFunc),
 	}
 
 	keyConstants := declarations.keyConstants
 	groupConstants := declarations.groupConstants
 
+	var parentFunc *ast.FuncDecl
 	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
+		if decl, ok := n.(*ast.FuncDecl); ok {
+			parentFunc = decl
 			return true
 		}
 
-		if len(call.Args) < 2 {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) < 2 {
 			return true
 		}
 
 		selector, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
-			return true
-		}
-
-		lookupFuncName := selector.Sel.Name
-		if _, isLookupFunc := lookupFuncs[lookupFuncName]; !isLookupFunc {
-			return true
-		}
-
-		groupConst, ok := call.Args[0].(*ast.Ident)
-		if !ok {
-			panic(fmt.Sprintf("expected lookup function's 1st argument to be an identifier containing a group name "+
-				"(*ast.Ident) but found %T instead. The parser likely needs to be updated", call.Args[0]))
-		}
-
-		key := lookupFuncKey{}
-		switch arg1 := call.Args[1].(type) {
-		case *ast.Ident:
-			key.name = arg1.Name
-		case *ast.BasicLit:
-			if arg1.Kind != token.STRING {
-				panic(fmt.Sprintf("expected the 2nd argument of lookup function %s to be a string litreal "+
-					"but was %T instead", types.ExprString(selector), call.Args[1]))
+			ident, ok := call.Fun.(*ast.Ident)
+			if !ok {
+				return true
 			}
-			key.name, _ = strconv.Unquote(arg1.Value)
-			key.literal = true
-		case *ast.IndexExpr: // ignore those and look for alternative lookup functions
-		default:
-			panic(fmt.Sprintf("expected the 2nd argument of lookup function %s to be an identifier containing a key name "+
-				"or a string literal but found %T instead.", types.ExprString(selector), call.Args[1]))
+
+			_, ok = alternativeLookupFuncs[ident.Name]
+			if !ok {
+				return true
+			}
+
+			groupArgIndex := 1
+			keyArgIndex := 2
+			groupConstName, keysMap := mustGetLookupFuncArgs(call, groupArgIndex, keyArgIndex)
+
+			keyConstNames := mustGetMapKeyFromVariableDefinition(parentFunc.Body.List, keysMap.name)
+			for _, keyConstName := range keyConstNames {
+				calls.alternative[lookupFuncArgs{
+					group: groupConstants[groupConstName],
+					key:   lookupFuncKey{name: keyConstants[keyConstName]},
+				}] = lookupFuncs[alternativeLookupFuncs[ident.Name]]
+			}
+
+			return true
 		}
 
-		groupName, okGroup := groupConstants[groupConst.Name]
+		lookupFunc, isLookupFunc := lookupFuncs[selector.Sel.Name]
+		if !isLookupFunc {
+			return true
+		}
+
+		groupArgIndex := 0
+		keyArgIndex := 1
+		groupConstName, key := mustGetLookupFuncArgs(call, groupArgIndex, keyArgIndex)
+
+		groupName, okGroup := groupConstants[groupConstName]
 		keyName, okKey := keyConstants[key.name]
 
 		if okGroup && okKey {
 			calls.direct[lookupFuncArgs{
 				group: groupName,
 				key:   lookupFuncKey{name: keyName},
-			}] = lookupFuncName
+			}] = lookupFunc
 		} else {
 			calls.ambiguous[lookupFuncArgs{
-				group: groupConst.Name,
+				group: groupConstName,
 				key:   key,
-			}] = lookupFuncName
+			}] = lookupFunc
 		}
 
 		return true
 	})
 
 	return calls
+}
+
+func mustGetMapKeyFromVariableDefinition(statements []ast.Stmt, name string) []string {
+	for _, statement := range statements {
+		statement, ok := statement.(*ast.AssignStmt)
+		if !ok || statement.Tok != token.ASSIGN && statement.Tok != token.DEFINE {
+			continue
+		}
+
+		var value *ast.CompositeLit
+		for i, variable := range statement.Lhs {
+			ident, ok := variable.(*ast.Ident)
+			if !ok {
+				continue
+			}
+
+			if ident.Name != name {
+				continue
+			}
+
+			variableValue := statement.Rhs[i]
+			value, ok = variableValue.(*ast.CompositeLit)
+			if !ok {
+				panic(fmt.Sprintf("expected variable %s to be a composite literal but found type %T instead", name, variableValue))
+			}
+
+			break
+		}
+
+		if value == nil {
+			continue
+		}
+
+		_, isMap := value.Type.(*ast.MapType)
+		if !isMap {
+			panic(fmt.Sprintf("expected variable %s to be a map but found type %T instead", name, value.Type))
+		}
+
+		keys := make([]string, 0, len(value.Elts))
+		for _, elt := range value.Elts {
+			kv, ok := elt.(*ast.KeyValueExpr)
+			if !ok {
+				panic(fmt.Sprintf("expected elements of composite literal of variable %s to be of of type "+
+					"*ast.KeyValueExpr but found type %T instead", name, elt))
+			}
+
+			keyConst, ok := kv.Key.(*ast.Ident)
+			if !ok {
+				panic(fmt.Sprintf("expected key of key-value element of composite literal of variable %s to be of of type "+
+					"*ast.Ident but found type %T instead", name, kv.Key))
+			}
+
+			keys = append(keys, keyConst.Name)
+		}
+
+		return keys
+	}
+
+	return nil
+}
+
+func mustGetLookupFuncArgs(call *ast.CallExpr, groupArgIndex, keyArgIndex int) (string, lookupFuncKey) {
+	groupConst, ok := call.Args[groupArgIndex].(*ast.Ident)
+	if !ok {
+		panic(fmt.Sprintf("expected lookup function's 1st argument to be an identifier containing a group name "+
+			"(*ast.Ident) but found %T instead. The parser likely needs to be updated", call.Args[0]))
+	}
+
+	key := lookupFuncKey{}
+	switch arg1 := call.Args[keyArgIndex].(type) {
+	case *ast.Ident:
+		key.name = arg1.Name
+	case *ast.BasicLit:
+		if arg1.Kind != token.STRING {
+			panic(fmt.Sprintf("expected the 2nd argument of lookup function %s to be a string litreal "+
+				"but was %T instead. The parser likely needs to be updated", types.ExprString(call.Fun), call.Args[1]))
+		}
+		key.name, _ = strconv.Unquote(arg1.Value)
+		key.literal = true
+	case *ast.IndexExpr: // ignore those and look for alternative lookup functions
+	default:
+		panic(fmt.Sprintf("expected the 2nd argument of lookup function %s to be an identifier containing a key name "+
+			"or a string literal but found %T instead. The parser likely needs to be updated", types.ExprString(call.Fun), call.Args[1]))
+	}
+	return groupConst.Name, key
 }
 
 func isKeyNameConst(name string) bool {

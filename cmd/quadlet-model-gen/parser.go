@@ -21,12 +21,6 @@ var keyMapByGroup = map[string]string{
 
 var groupByKeyMap = reverseMap(keyMapByGroup)
 
-var alternativeLookupMethods = map[string]string{
-	"lookupAndAddString":     "Lookup",
-	"lookupAndAddAllStrings": "LookupAll",
-	"lookupAndAddBoolean":    "LookupBoolean",
-}
-
 // Approximate number of elements present in the source files
 const (
 	nbGroups          = 11
@@ -89,37 +83,58 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	}
 
 	declarations := inspectQuadletSourceFileDeclarations(parsed)
-	otherConstants := declarations.otherConstants
-	keyConstants := declarations.keyConstants
+	calls := inspectQuadletSourceFileLookupCalls(parsed, declarations, lookupFuncs)
+	lookupFuncByGroupKey, additionalFields := parseLookupCalls(declarations, calls)
+
 	groupConstants := declarations.groupConstants
-	supportedKeysMaps := declarations.supportedKeysMaps
-
-	lookupCalls := inspectQuadletSourceFileLookupFuncCalls(parsed, declarations, lookupFuncs)
-
 	fieldsByGroup := make(map[string][]field, len(groupConstants))
+	for _, group := range groupConstants {
+		keyMapName := keyMapByGroup[group]
+		for _, keyConstName := range declarations.supportedKeysMaps[keyMapName] {
+			key := declarations.keyConstants[keyConstName]
+			fieldsByGroup[group] = append(fieldsByGroup[group], field{
+				Group:      group,
+				Key:        key,
+				LookupFunc: lookupFuncByGroupKey[group][key],
+			})
+		}
+	}
+
+	return mergeMaps(fieldsByGroup, additionalFields), nil
+}
+
+func parseLookupCalls(declarations declarations, calls lookupFuncCalls) (map[string]map[string]lookupFunc, map[string][]field) {
+	otherConstants := declarations.otherConstants
+	groupConstants := declarations.groupConstants
+	keyConstants := declarations.keyConstants
+	supportedKeysMaps := declarations.supportedKeysMaps
 
 	lookupFuncByGroupKey := make(map[string]map[string]lookupFunc, nbGroups)
 	for _, group := range groupConstants {
 		lookupFuncByGroupKey[group] = make(map[string]lookupFunc, nbKeysPerGroup)
 	}
 
-	for args, funcName := range lookupCalls.direct {
-		lookupFuncByGroupKey[args.group][args.key.name] = lookupFuncs[funcName]
+	for args, lookupFunc := range calls.direct {
+		lookupFuncByGroupKey[args.group][args.key.name] = lookupFunc
 	}
 
-	for args, funcName := range lookupCalls.ambiguous {
-		if group, ok := groupConstants[args.group]; ok && args.key.literal {
-			fieldsByGroup[group] = append(fieldsByGroup[group], field{
+	for args, lookupFunc := range calls.alternative {
+		lookupFuncByGroupKey[args.group][args.key.name] = lookupFunc
+	}
+
+	additionalFields := make(map[string][]field, len(groupConstants))
+	for args, lookupFunc := range calls.ambiguous {
+		if group, ok := groupConstants[args.group]; ok {
+			var key string
+			if args.key.literal {
+				key = args.key.name
+			} else {
+				key = otherConstants[args.key.name]
+			}
+			additionalFields[group] = append(additionalFields[group], field{
 				Group:      group,
-				Key:        args.key.name,
-				LookupFunc: lookupFuncs[funcName],
-			})
-			continue
-		} else if ok && !args.key.literal { // Key constant is not prefixed with Key
-			fieldsByGroup[group] = append(fieldsByGroup[group], field{
-				Group:      group,
-				Key:        otherConstants[args.key.name],
-				LookupFunc: lookupFuncs[funcName],
+				Key:        key,
+				LookupFunc: lookupFunc,
 			})
 			continue
 		}
@@ -129,24 +144,12 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 			for _, keyVarName := range keyVarNames {
 				if keyVarName == args.key.name {
 					key := keyConstants[args.key.name]
-					lookupFuncByGroupKey[group][key] = lookupFuncs[funcName]
+					lookupFuncByGroupKey[group][key] = lookupFunc
 					break
 				}
 			}
 		}
 	}
 
-	for _, group := range groupConstants {
-		keyMapName := keyMapByGroup[group]
-		for _, keyConstName := range supportedKeysMaps[keyMapName] {
-			key := keyConstants[keyConstName]
-			fieldsByGroup[group] = append(fieldsByGroup[group], field{
-				Group:      group,
-				Key:        key,
-				LookupFunc: lookupFuncByGroupKey[group][key],
-			})
-		}
-	}
-
-	return fieldsByGroup, nil
+	return lookupFuncByGroupKey, additionalFields
 }

@@ -29,7 +29,9 @@ func TestQuadletParser(t *testing.T) {
 	for group, fields := range fieldsByGroup {
 		fmt.Println(group)
 		for _, field := range fields {
-			fmt.Printf("\t%#v\n", field)
+			if field.LookupFunc.Name == "" {
+				fmt.Printf("\t%#v\n", field)
+			}
 		}
 	}
 }
