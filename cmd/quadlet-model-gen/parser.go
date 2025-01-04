@@ -100,7 +100,17 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 		}
 	}
 
-	return mergeMaps(fieldsByGroup, additionalFields), nil
+	// Easier this way...
+	fieldsByGroup = mergeMaps(fieldsByGroup, additionalFields)
+	for group, fields := range fieldsByGroup {
+		for i, field := range fields {
+			if strings.HasPrefix(field.Key, "Health") {
+				fieldsByGroup[group][i].LookupFunc = lookupFuncs["Lookup"]
+			}
+		}
+	}
+
+	return fieldsByGroup, nil
 }
 
 func parseLookupCalls(declarations declarations, calls lookupFuncCalls) (map[string]map[string]lookupFunc, map[string][]field) {
