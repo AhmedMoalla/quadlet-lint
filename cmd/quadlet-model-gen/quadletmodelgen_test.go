@@ -22,6 +22,8 @@ const (
 )
 
 func TestQuadletModelGen(t *testing.T) {
+	t.Parallel()
+
 	generatedRefDir, err := os.Open(generatedRefDirName)
 	if err != nil && os.IsNotExist(err) {
 		t.Fatal(errors.Join(err, errors.New("'go generate' was not run before starting the test")))
@@ -61,6 +63,8 @@ type testInspectionResult struct {
 }
 
 func compareFiles(t *testing.T, generatedRefDir *os.File, generatedDir *os.File) error {
+	t.Helper()
+
 	refResult, err := inspectDir(t, generatedRefDir)
 	if err != nil {
 		return err
@@ -76,6 +80,8 @@ func compareFiles(t *testing.T, generatedRefDir *os.File, generatedDir *os.File)
 }
 
 func inspectDir(t *testing.T, dir *os.File) (map[string]testInspectionResult, error) {
+	t.Helper()
+
 	files, err := listAllFiles(dir.Name())
 	if err != nil {
 		return nil, err
@@ -96,6 +102,8 @@ func inspectDir(t *testing.T, dir *os.File) (map[string]testInspectionResult, er
 }
 
 func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
+	t.Helper()
+
 	parsed, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return testInspectionResult{}, err
@@ -114,60 +122,16 @@ func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
 		switch node.Tok {
 		case token.TYPE:
 			for _, spec := range node.Specs {
-				spec, _ := spec.(*ast.TypeSpec)
-				structType, ok := spec.Type.(*ast.StructType)
-				if !ok {
-					return false
+				if structDecl, ok := extractStructDecl(spec); ok {
+					result.structDecls = append(result.structDecls, structDecl)
 				}
-
-				fields := make(map[string]string, len(structType.Fields.List))
-				for _, field := range structType.Fields.List {
-					fields[field.Names[0].Name] = types.ExprString(field.Type)
-				}
-
-				result.structDecls = append(result.structDecls, structDecl{
-					name:   spec.Name.Name,
-					fields: fields,
-				})
 			}
 		case token.VAR:
 			for _, spec := range node.Specs {
-				valueSpec, ok := spec.(*ast.ValueSpec)
-				if !ok {
-					t.Fatalf("inspection does not support VARs specs other then *ast.ValueSpec. Found %T", spec)
-				}
-
-				compositeSpec, ok := valueSpec.Values[0].(*ast.CompositeLit)
-				if !ok {
-					t.Fatalf("inspection does not support VARs value specs other then *ast.CompositeLit. Found %T", valueSpec.Values[0])
-				}
-
-				if _, ok := compositeSpec.Type.(*ast.MapType); ok {
-					mapValue := computeMapField(t, compositeSpec)
-					if mapValue != nil {
-						result.variables[valueSpec.Names[0].Name] = mapValue
-					}
-					return true
-				}
-
-				fields := make(map[string]any)
-				for _, elt := range compositeSpec.Elts {
-					kv, ok := elt.(*ast.KeyValueExpr)
-					if !ok {
-						t.Fatalf("inspection does not support VARs composite literal specs other then *ast.KeyValueExpr. Found %T", elt)
-					}
-
-					key, ok := kv.Key.(*ast.Ident)
-					if !ok {
-						t.Fatalf("expected key to be of type *ast.Ident. Found %T", kv.Key)
-					}
-
-					fields[key.Name] = types.ExprString(kv.Value)
-				}
-
-				result.variables[valueSpec.Names[0].Name] = structInstance{
-					structType: types.ExprString(compositeSpec.Type),
-					fields:     fields,
+				if varName, varValue, err := extractVariable(spec); err == nil {
+					result.variables[varName] = varValue
+				} else {
+					t.Fatal(err)
 				}
 			}
 		default:
@@ -180,8 +144,65 @@ func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
 	return result, nil
 }
 
+func extractVariable(spec ast.Spec) (string, any, error) {
+	valueSpec, ok := spec.(*ast.ValueSpec)
+	if !ok {
+		return "", nil, fmt.Errorf(
+			"inspection does not support VARs specs other then *ast.ValueSpec. Found %T", spec)
+	}
+
+	compositeSpec, ok := valueSpec.Values[0].(*ast.CompositeLit)
+	if !ok {
+		return "", nil, fmt.Errorf(
+			"inspection does not support VARs value specs other then *ast.CompositeLit. Found %T", valueSpec.Values[0])
+	}
+
+	if _, ok := compositeSpec.Type.(*ast.MapType); ok {
+		mapValue := computeMapField(compositeSpec)
+		if mapValue != nil {
+			return valueSpec.Names[0].Name, mapValue, nil
+		}
+	}
+
+	fields := make(map[string]any)
+	for _, elt := range compositeSpec.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			return "", nil, fmt.Errorf(
+				"inspection does not support VARs composite literal specs other then *ast.KeyValueExpr. Found %T", elt)
+		}
+
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok {
+			return "", nil, fmt.Errorf("expected key to be of type *ast.Ident. Found %T", kv.Key)
+		}
+
+		fields[key.Name] = types.ExprString(kv.Value)
+	}
+
+	return valueSpec.Names[0].Name, structInstance{
+		structType: types.ExprString(compositeSpec.Type),
+		fields:     fields,
+	}, nil
+}
+
+func extractStructDecl(spec ast.Spec) (structDecl, bool) {
+	typeSpec, _ := spec.(*ast.TypeSpec)
+	structType, ok := typeSpec.Type.(*ast.StructType)
+	if !ok {
+		return structDecl{}, false
+	}
+
+	fields := make(map[string]string, len(structType.Fields.List))
+	for _, field := range structType.Fields.List {
+		fields[field.Names[0].Name] = types.ExprString(field.Type)
+	}
+
+	return structDecl{name: typeSpec.Name.Name, fields: fields}, true
+}
+
 // computeMapField can handle nested maps with string keys
-func computeMapField(t *testing.T, spec *ast.CompositeLit) any {
+func computeMapField(spec *ast.CompositeLit) any {
 	result := make(map[string]any, len(spec.Elts))
 	for _, elt := range spec.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
@@ -195,7 +216,7 @@ func computeMapField(t *testing.T, spec *ast.CompositeLit) any {
 		}
 
 		if value, ok := kv.Value.(*ast.CompositeLit); ok {
-			result[key.Value] = computeMapField(t, value)
+			result[key.Value] = computeMapField(value)
 		} else if value, ok := kv.Value.(*ast.SelectorExpr); ok {
 			result[key.Value] = types.ExprString(value)
 		} else {
