@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 const (
@@ -100,7 +102,10 @@ func downloadSourceFileFromGithub(location string, version string) (*os.File, er
 		return nil, fmt.Errorf("unexpected status '%s' when downloading from '%s'", response.Status, url)
 	}
 
-	file, err := os.CreateTemp("", "quadlet-*.go")
+	fileName := filepath.Base(location)
+	ext := filepath.Ext(fileName)
+	fileName = strings.TrimSuffix(fileName, ext)
+	file, err := os.CreateTemp("", fileName+"-*"+ext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file to copy the content of quadlet file: %w", err)
 	}

@@ -1,17 +1,17 @@
 package main
 
 import (
-	"fmt"
+	"os"
 	"testing"
 )
 
 func TestQuadletParser(t *testing.T) {
-	file, err := downloadSourceFileFromGithub(quadletFileLocation, "v5.3.1")
+	file, err := os.Open("testdata/quadlet.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, "v5.3.1")
+	parserFile, err := os.Open("testdata/unitfile.go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,11 +26,16 @@ func TestQuadletParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for group, fields := range fieldsByGroup {
-		fmt.Println(group)
+	for _, fields := range fieldsByGroup {
 		for _, field := range fields {
+			if field.Group == "" {
+				t.Errorf("field group is empty: %+v", field)
+			}
+			if field.Key == "" {
+				t.Errorf("field key is empty: %+v", field)
+			}
 			if field.LookupFunc.Name == "" {
-				fmt.Printf("\t%#v\n", field)
+				t.Errorf("field has no LookupFunc: %+v", field)
 			}
 		}
 	}
