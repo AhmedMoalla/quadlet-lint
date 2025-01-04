@@ -113,7 +113,10 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	return fieldsByGroup, nil
 }
 
-func parseLookupCalls(declarations declarations, calls lookupFuncCalls) (map[string]map[string]lookupFunc, map[string][]field) {
+func parseLookupCalls(
+	declarations declarations,
+	calls lookupFuncCalls,
+) (map[string]map[string]lookupFunc, map[string][]field) {
 	otherConstants := declarations.otherConstants
 	groupConstants := declarations.groupConstants
 	keyConstants := declarations.keyConstants

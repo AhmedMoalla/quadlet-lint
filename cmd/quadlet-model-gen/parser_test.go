@@ -6,6 +6,8 @@ import (
 )
 
 func TestQuadletParser(t *testing.T) {
+	t.Parallel()
+
 	file, err := os.Open("testdata/quadlet.go")
 	if err != nil {
 		t.Fatal(err)

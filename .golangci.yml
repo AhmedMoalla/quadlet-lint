@@ -21,6 +21,8 @@ linters:
     - cyclop
     - maintidx
 linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
   staticcheck:
     checks:
       - '-SA4004'

@@ -10,7 +10,7 @@ build: generate
 	go build -v -o bin ./cmd/quadlet-lint
 
 # TODO Add coverage reporting
-test:
+test: generate
 	go test ./...
 
 lint:
