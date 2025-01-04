@@ -14,7 +14,7 @@ cd "$gitRoot"
 git reset --quiet --hard
 git switch main --quiet
 git reset --quiet --hard origin/main
-go generate ./...
+go generate github.com/AhmedMoalla/quadlet-lint/pkg/model
 cp -R "$gitRoot/pkg/model/generated" "$generatedOutput"
 
 rm -rf "$gitRoot"
