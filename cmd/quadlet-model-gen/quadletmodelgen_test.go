@@ -29,12 +29,22 @@ func TestQuadletModelGen(t *testing.T) {
 		t.Fatal(errors.Join(err, errors.New("'go generate' was not run before starting the test")))
 	}
 
-	podmanVersion, err := getPodmanVersionFromGeneratedComment()
+	podmanVersion, err := getPodmanVersionFromGeneratedComment(generatedRefDirName + "/groups.go")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	runLinter(podmanVersion)
+	unitfile, err := os.Open("testdata/" + podmanVersion + "/unitfile.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	quadlet, err := os.Open("testdata/" + podmanVersion + "/quadlet.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parseAndGenerateFiles(quadlet, unitfile)
 	defer os.RemoveAll(generatedDirName)
 	generatedDir, err := os.Open(generatedRefDirName)
 	if err != nil && os.IsNotExist(err) {
@@ -250,8 +260,8 @@ func listAllFiles(dir string) ([]string, error) {
 	return files, nil
 }
 
-func getPodmanVersionFromGeneratedComment() (string, error) {
-	file, err := os.Open(generatedRefDirName + "/groups.go")
+func getPodmanVersionFromGeneratedComment(generatedFile string) (string, error) {
+	file, err := os.Open(generatedFile)
 	if err != nil {
 		return "", err
 	}

@@ -27,27 +27,29 @@ var (
 
 func main() {
 	flag.Parse()
-	runLinter(*podmanVersion)
-}
 
-func runLinter(podmanVersion string) {
-	podmanVersion = getPodmanVersion(podmanVersion)
+	podmanVersion := getPodmanVersion(*podmanVersion)
+
 	unitfileParserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, podmanVersion)
 	if err != nil {
 		exit(fmt.Errorf("could not download unitfile.go source file: %w", err))
 	}
 	defer os.Remove(unitfileParserFile.Name())
 
-	lookupFuncs, err := parseUnitFileParserSourceFile(unitfileParserFile)
-	if err != nil {
-		exit(fmt.Errorf("could not parse unitfile parser source file: %w", err))
-	}
-
 	quadletSourceFile, err := downloadSourceFileFromGithub(quadletFileLocation, podmanVersion)
 	if err != nil {
 		exit(fmt.Errorf("could not download quadlet.go source file: %w", err))
 	}
 	defer os.Remove(quadletSourceFile.Name())
+
+	parseAndGenerateFiles(quadletSourceFile, unitfileParserFile)
+}
+
+func parseAndGenerateFiles(quadletSourceFile, unitfileParserFile *os.File) {
+	lookupFuncs, err := parseUnitFileParserSourceFile(unitfileParserFile)
+	if err != nil {
+		exit(fmt.Errorf("could not parse unitfile parser source file: %w", err))
+	}
 
 	fieldsByGroup, err := parseQuadletSourceFile(quadletSourceFile, lookupFuncs)
 	if err != nil {

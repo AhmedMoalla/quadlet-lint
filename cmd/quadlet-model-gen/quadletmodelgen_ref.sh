@@ -4,16 +4,17 @@ set -e
 
 generatedOutput="$PWD/$1"
 
-workingDir=$PWD/.work
-gitRoot="$workingDir/quadlet-model-gen"
-rm -rf "$workingDir"
+gitRoot="/tmp/quadlet-model-gen-$(((RANDOM<<15)|RANDOM))"
 rm -rf "$generatedOutput"
-mkdir "$workingDir"
 
-[ ! -d "$gitRoot" ] && git clone --quiet -b main --single-branch https://github.com/AhmedMoalla/quadlet-lint.git "$gitRoot"
+currentGitRoot=$(git rev-parse --show-toplevel)
+cp -R "$currentGitRoot" "$gitRoot"
 
 cd "$gitRoot"
+git reset --quiet --hard
+git switch main --quiet
+git reset --quiet --hard origin/main
 go generate ./...
 cp -R "$gitRoot/pkg/model/generated" "$generatedOutput"
 
-rm -rf "$workingDir"
+rm -rf "$gitRoot"
