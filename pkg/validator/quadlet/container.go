@@ -1,6 +1,7 @@
 package quadlet
 
 import (
+	"log/slog"
 	"regexp"
 
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
@@ -14,6 +15,7 @@ import (
 type containerValidator struct {
 	name    string
 	context V.Context
+	logger  *slog.Logger
 }
 
 func (v containerValidator) Name() string {

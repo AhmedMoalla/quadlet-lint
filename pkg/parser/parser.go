@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
@@ -61,6 +62,7 @@ type UnitFile struct {
 	groupByName map[string]*unitGroup
 
 	Filename string
+	FilePath string // TODO: Should be relative to input dir
 	UnitType UnitType
 }
 
@@ -127,7 +129,7 @@ func (f *UnitFile) lookupSingle(field model.Field) (LookupResult, bool) {
 	case lookup.LookupInt, lookup.LookupUint32:
 		val, ok = f.lookupInt(field)
 	default:
-		panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
+		panic(fmt.Sprintf("lookup mode '%s' is not supported for field '%s'", field.LookupFunc.Name, field.Key))
 	}
 	return singleResult(val), ok
 }
@@ -228,7 +230,7 @@ func (g *unitGroup) findLast(key string) *unitLine {
 }
 
 // Create an empty unit file, with no filename or path
-func NewUnitFile() *UnitFile {
+func newUnitFile() *UnitFile {
 	f := &UnitFile{
 		groups:      make([]*unitGroup, 0),
 		groupByName: make(map[string]*unitGroup),
@@ -244,10 +246,13 @@ func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 		return nil, []ParsingError{{inner: e}}
 	}
 
-	f := NewUnitFile()
+	f := newUnitFile()
 	f.Filename = path.Base(pathName)
+	f.FilePath = pathName
 	ext := path.Ext(pathName)
 	f.UnitType = UnitType{Name: ext[1:], Ext: ext}
+
+	slog.Debug("parsing unit file", "unitFile", f.FilePath)
 
 	parsingErrors := f.Parse(string(data))
 	if len(parsingErrors) > 0 {

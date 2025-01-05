@@ -1,6 +1,8 @@
 package quadlet
 
 import (
+	"log/slog"
+
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
@@ -20,13 +22,17 @@ func Validator(units []parser.UnitFile, options validator.Options) validator.Val
 		name:    ValidatorName,
 		context: context,
 		validators: map[parser.UnitType]validator.Validator{
-			parser.UnitTypeContainer: containerValidator{name: "container", context: context},
-			parser.UnitTypeVolume:    noOpValidator{},
-			parser.UnitTypeKube:      noOpValidator{},
-			parser.UnitTypeNetwork:   noOpValidator{},
-			parser.UnitTypeImage:     noOpValidator{},
-			parser.UnitTypeBuild:     noOpValidator{},
-			parser.UnitTypePod:       noOpValidator{},
+			parser.UnitTypeContainer: containerValidator{
+				name:    "container",
+				context: context,
+				logger:  slog.With("validator", ValidatorName+".container"),
+			},
+			parser.UnitTypeVolume:  noOpValidator{},
+			parser.UnitTypeKube:    noOpValidator{},
+			parser.UnitTypeNetwork: noOpValidator{},
+			parser.UnitTypeImage:   noOpValidator{},
+			parser.UnitTypeBuild:   noOpValidator{},
+			parser.UnitTypePod:     noOpValidator{},
 		},
 	}
 }
@@ -46,7 +52,9 @@ func (v quadletValidator) Context() validator.Context {
 }
 
 func (v quadletValidator) Validate(unit parser.UnitFile) []validator.ValidationError {
-	return v.validators[unit.UnitType].Validate(unit)
+	unitValidator := v.validators[unit.UnitType]
+	slog.Debug("validating file", "validator", v.Name()+"."+unitValidator.Name(), "unitFile", unit.FilePath)
+	return unitValidator.Validate(unit)
 }
 
 type noOpValidator struct{}
