@@ -1,8 +1,16 @@
 package rules
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+)
+
+var (
+	ErrInvalidPartLen  = errors.New("invalid parts length")
+	ErrEmptyOpts       = errors.New("no options after separator")
+	ErrNoRemainingOpts = errors.New("no remaining options after separator")
+	ErrInvalidOptions  = errors.New("invalid options")
 )
 
 // Format is the format that a value of a given key has
@@ -25,8 +33,9 @@ type Format struct {
 func (f *Format) ParseAndValidate(value string) error {
 	split := strings.Split(value, f.ValueSeparator)
 	if len(split) == 0 || len(split) > 2 {
-		return fmt.Errorf("'%s' does not match the '%s' format because it is expected to have 2 parts after "+
-			"splitting the value with '%s' but got instead %d parts", value, f.Name, f.ValueSeparator, len(split))
+		return fmt.Errorf("%w: '%s' does not match the '%s' format because it is expected to have 2 parts after "+
+			"splitting the value with '%s' but got instead %d parts", ErrInvalidPartLen, value, f.Name, f.ValueSeparator,
+			len(split))
 	}
 
 	f.Value = split[0]
@@ -36,8 +45,8 @@ func (f *Format) ParseAndValidate(value string) error {
 	}
 
 	if len(split[1]) == 0 { // empty options
-		return fmt.Errorf("'%s' does not match the '%s' format because no options were found after "+
-			"the value separator '%s'", value, f.Name, f.ValueSeparator)
+		return fmt.Errorf("%w: '%s' does not match the '%s' format because no options were found after "+
+			"the value separator '%s'", ErrEmptyOpts, value, f.Name, f.ValueSeparator)
 	}
 
 	split = strings.Split(split[1], f.OptionsSeparator)
@@ -49,15 +58,15 @@ func (f *Format) ParseAndValidate(value string) error {
 		} else if len(kv) == 2 {
 			options[kv[0]] = kv[1]
 		} else {
-			return fmt.Errorf("'%s' does not match the '%s' format because no remaining options were found after "+
-				"the options separator '%s'", value, f.Name, f.OptionsSeparator)
+			return fmt.Errorf("%w: '%s' does not match the '%s' format because no remaining options were found after "+
+				"the options separator '%s'", ErrNoRemainingOpts, value, f.Name, f.OptionsSeparator)
 		}
 	}
 	f.Options = options
 
 	if f.ValidateOptions != nil {
 		if err := f.ValidateOptions(f.Value, f.Options); err != nil {
-			return err
+			return errors.Join(err, ErrInvalidOptions)
 		}
 	}
 
