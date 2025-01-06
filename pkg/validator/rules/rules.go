@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model"
-	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
@@ -23,7 +23,7 @@ func ErrSlice(validatorName string, errType V.ErrorType, line, column int, messa
 	return []V.ValidationError{*V.Err(validatorName, errType, line, column, message)}
 }
 
-func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.ValidationError {
+func CheckRules(validator V.Validator, unit P.UnitFile, rules model.Groups) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 
 	groupsValue := reflect.ValueOf(rules)
@@ -42,7 +42,7 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules Groups) []V.Valida
 
 			ruleFns, _ := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
 			for _, rule := range ruleFns {
-				field, ok := Fields[groupName][fieldName]
+				field, ok := model.Fields[groupName][fieldName]
 				if !ok {
 					panic(fmt.Sprintf("field %s not found in Fields map", fieldName))
 				}
