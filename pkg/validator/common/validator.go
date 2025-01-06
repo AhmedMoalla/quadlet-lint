@@ -36,6 +36,7 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 			if _, ok := allowedFields[key.Key]; !ok {
 				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, key.Line, 0,
 					fmt.Sprintf("key '%s' is not allowed in group '%s'", key.Key, group)))
+				continue
 			}
 
 			if res, ok := unit.Lookup(allowedFields[key.Key]); ok && len(res.Values) == 0 {

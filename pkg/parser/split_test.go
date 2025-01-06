@@ -27,9 +27,5 @@ func TestSplitValueAppend(t *testing.T) {
 		{Key: "TestKey", Value: "TestValue3", Line: 10, Column: 33},
 	}
 
-	assert.Equal(t, len(expectedValues), len(values))
-
-	for i, expected := range expectedValues {
-		assert.Equal(t, expected, values[i])
-	}
+	assert.Equal(t, expectedValues, values)
 }

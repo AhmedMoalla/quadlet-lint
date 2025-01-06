@@ -58,18 +58,18 @@ func TestQuadletModelGen(t *testing.T) {
 }
 
 type structDecl struct {
-	name   string
-	fields map[string]string
+	Name   string
+	Fields map[string]string
 }
 
 type structInstance struct {
-	structType string
-	fields     map[string]any
+	StructType string
+	Fields     map[string]any
 }
 
 type testInspectionResult struct {
-	structDecls []structDecl
-	variables   map[string]any
+	StructDecls []structDecl
+	Variables   map[string]any
 }
 
 func compareFiles(t *testing.T, generatedRefDir *os.File, generatedDir *os.File) error {
@@ -120,8 +120,8 @@ func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
 	}
 
 	result := testInspectionResult{
-		structDecls: make([]structDecl, 0, 1),
-		variables:   make(map[string]any, 20),
+		StructDecls: make([]structDecl, 0, 1),
+		Variables:   make(map[string]any, 20),
 	}
 	ast.Inspect(parsed, func(n ast.Node) bool {
 		node, ok := n.(*ast.GenDecl)
@@ -133,13 +133,13 @@ func inspectFile(t *testing.T, file string) (testInspectionResult, error) {
 		case token.TYPE:
 			for _, spec := range node.Specs {
 				if structDecl, ok := extractStructDecl(spec); ok {
-					result.structDecls = append(result.structDecls, structDecl)
+					result.StructDecls = append(result.StructDecls, structDecl)
 				}
 			}
 		case token.VAR:
 			for _, spec := range node.Specs {
 				if varName, varValue, err := extractVariable(spec); err == nil {
-					result.variables[varName] = varValue
+					result.Variables[varName] = varValue
 				} else {
 					t.Fatal(err)
 				}
@@ -191,8 +191,8 @@ func extractVariable(spec ast.Spec) (string, any, error) {
 	}
 
 	return valueSpec.Names[0].Name, structInstance{
-		structType: types.ExprString(compositeSpec.Type),
-		fields:     fields,
+		StructType: types.ExprString(compositeSpec.Type),
+		Fields:     fields,
 	}, nil
 }
 
@@ -208,7 +208,7 @@ func extractStructDecl(spec ast.Spec) (structDecl, bool) {
 		fields[field.Names[0].Name] = types.ExprString(field.Type)
 	}
 
-	return structDecl{name: typeSpec.Name.Name, fields: fields}, true
+	return structDecl{Name: typeSpec.Name.Name, Fields: fields}, true
 }
 
 // computeMapField can handle nested maps with string keys
