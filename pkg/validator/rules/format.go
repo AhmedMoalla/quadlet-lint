@@ -35,11 +35,23 @@ func (f *Format) ParseAndValidate(value string) error {
 		return nil
 	}
 
+	if len(split[1]) == 0 { // empty options
+		return fmt.Errorf("'%s' does not match the '%s' format because no options were found after "+
+			"the value separator '%s'", value, f.Name, f.ValueSeparator)
+	}
+
 	split = strings.Split(split[1], f.OptionsSeparator)
 	options := make(map[string]string, len(split))
 	for _, pair := range split {
 		kv := strings.Split(pair, "=")
-		options[kv[0]] = kv[1]
+		if len(kv) == 1 && len(kv[0]) > 0 { // value only option
+			options[kv[0]] = kv[0]
+		} else if len(kv) == 2 {
+			options[kv[0]] = kv[1]
+		} else {
+			return fmt.Errorf("'%s' does not match the '%s' format because no remaining options were found after "+
+				"the options separator '%s'", value, f.Name, f.OptionsSeparator)
+		}
 	}
 	f.Options = options
 

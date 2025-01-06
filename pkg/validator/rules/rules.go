@@ -110,9 +110,8 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 						validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidReference, value.Line, value.Column,
 							fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType.Name, value.Value)))
 					}
+					break
 				}
-
-				break
 			}
 		}
 
