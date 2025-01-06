@@ -244,12 +244,16 @@ func ParseUnitFile(pathName string) (*UnitFile, []ParsingError) {
 		return nil, []ParsingError{{inner: e}}
 	}
 
+	return ParseUnitFileString(pathName, string(data))
+}
+
+func ParseUnitFileString(pathName, content string) (*UnitFile, []ParsingError) {
 	f := NewUnitFile()
 	f.Filename = path.Base(pathName)
 	ext := path.Ext(pathName)
 	f.UnitType = UnitType{Name: ext[1:], Ext: ext}
 
-	parsingErrors := f.Parse(string(data))
+	parsingErrors := f.Parse(content)
 	if len(parsingErrors) > 0 {
 		return nil, parsingErrors
 	}
@@ -686,7 +690,7 @@ func (f *UnitFile) lookupAll(field model.Field) []UnitValue {
 // This is typically used by systemd keys like "RequiredBy" and "Aliases".
 func (f *UnitFile) lookupAllStrv(field model.Field) []UnitValue {
 	values := f.lookupAll(field)
-	res := make([]UnitValue, len(values))
+	res := make([]UnitValue, 0, len(values))
 	for _, value := range values {
 		res, _ = splitValueAppend(res, value, WhitespaceSeparators, SplitRetainEscape|SplitUnquote)
 	}
