@@ -2,15 +2,54 @@ package rules
 
 import (
 	"regexp"
+	"slices"
 	"testing"
 
+	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"github.com/stretchr/testify/assert"
 )
 
 var v = newTestValidator(V.Options{})
+
+func TestCheckRules(t *testing.T) {
+	unit := parseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
+	rules := model.Groups{
+		Container: container.GContainer{
+			Rootfs: Rules(RequiredIfNotPresent(container.Image)),
+		},
+		Service: service.GService{
+			KillMode: Rules(AllowedValues("mixed", "control-group")),
+		},
+	}
+
+	errs := CheckRules(v, unit, rules)
+	assert.Len(t, errs, 2)
+
+	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
+		return err.ValidatorName == v.Name() &&
+			err.ErrorType == V.RequiredKey &&
+			err.Line == 0 && err.Column == 0
+	}))
+
+	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
+		return err.ValidatorName == v.Name() &&
+			err.ErrorType == V.InvalidValue &&
+			err.Line == 4 && err.Column == 9
+	}))
+}
+
+func TestCheckRulesShouldPanicIfFieldNotGeneratedInModel(t *testing.T) {
+	field := model.Fields["Container"][container.Rootfs.Key]
+	delete(model.Fields["Container"], container.Rootfs.Key)
+	assert.Panics(t, func() {
+		TestCheckRules(t)
+	})
+	model.Fields["Container"][container.Rootfs.Key] = field
+}
 
 func TestRequiredIfNotPresent(t *testing.T) {
 	tests := []struct {
