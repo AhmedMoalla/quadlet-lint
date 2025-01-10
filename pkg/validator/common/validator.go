@@ -22,12 +22,12 @@ func (v commonValidator) Context() V.Context {
 	return V.Context{}
 }
 
-var ignoreGroups = map[string]bool{"Service": true, "Install": true, "Unit": true}
+var ignoredSystemdGroups = map[string]bool{"Service": true, "Install": true, "Unit": true}
 
 func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 	for _, group := range unit.ListGroups() {
-		if _, ignored := ignoreGroups[group]; ignored {
+		if _, ignored := ignoredSystemdGroups[group]; ignored {
 			continue
 		}
 

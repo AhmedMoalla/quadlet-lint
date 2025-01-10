@@ -9,14 +9,15 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"github.com/stretchr/testify/assert"
 )
 
-var v = newTestValidator(V.Options{})
+var v = testutils.NewTestValidator(V.Options{})
 
 func TestCheckRules(t *testing.T) {
-	unit := parseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
+	unit := testutils.ParseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
 	rules := model.Groups{
 		Container: container.GContainer{
 			Rootfs: Rules(RequiredIfNotPresent(container.Image)),
@@ -67,7 +68,7 @@ func TestRequiredIfNotPresent(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.Rootfs)
 
 			assert.Len(t, errs, test.nErrors)
@@ -102,7 +103,7 @@ func TestConflictsWith(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.RemapUid)
 			assert.Len(t, errs, test.nErrors)
 
@@ -119,7 +120,7 @@ func TestConflictsWith(t *testing.T) {
 }
 
 func TestCanReference(t *testing.T) {
-	vRef := newTestValidator(V.Options{CheckReferences: true}, "test.network", "test.container")
+	vRef := testutils.NewTestValidator(V.Options{CheckReferences: true}, "test.network", "test.container")
 	tests := []struct {
 		name      string
 		unit      string
@@ -140,7 +141,7 @@ func TestCanReference(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(test.validator, unit, container.Network)
 			assert.Len(t, errs, len(test.errors))
 
@@ -178,7 +179,7 @@ func TestHaveFormat(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.Network)
 			assert.Len(t, errs, len(test.errors))
 
@@ -214,7 +215,7 @@ func TestAllowedValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.PublishPort)
 			assert.Len(t, errs, len(test.errors))
 
@@ -246,7 +247,7 @@ func TestHasSuffix(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.Pod)
 			assert.Len(t, errs, len(test.errors))
 
@@ -278,7 +279,7 @@ func TestDependsOn(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.Group)
 			assert.Len(t, errs, len(test.errors))
 
@@ -310,7 +311,7 @@ func TestDeprecated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.RemapUid)
 			assert.Len(t, errs, len(test.errors))
 
@@ -342,7 +343,7 @@ func TestMatchRegexp(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.RemapUid)
 			assert.Len(t, errs, len(test.errors))
 
@@ -377,7 +378,7 @@ func TestValuesMust(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			errs := rule(v, unit, container.RemapUid)
 			assert.Len(t, errs, len(test.errors))
 
@@ -408,7 +409,7 @@ func TestHaveZeroOrOneValues(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			res, _ := unit.Lookup(container.RemapUid)
 
 			if err := HaveZeroOrOneValues(v, container.RemapUid, res.Values); err != nil {
@@ -440,49 +441,9 @@ func TestWhenFieldEquals(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			unit := parseString(t, test.unit)
+			unit := testutils.ParseString(t, test.unit)
 			result := rule(v, unit, container.User)
 			assert.Equal(t, test.result, result)
 		})
 	}
-}
-
-func parseString(t *testing.T, content string) P.UnitFile {
-	t.Helper()
-	unit, errs := P.ParseUnitFileString("test.container", content)
-	if len(errs) != 0 {
-		for _, err := range errs {
-			t.Error(err.Error())
-		}
-		t.Fatal("errors while parsing file content")
-	}
-
-	return *unit
-}
-
-type testValidator struct {
-	ctx V.Context
-}
-
-func (t testValidator) Name() string {
-	return "test"
-}
-
-func (t testValidator) Context() V.Context {
-	return t.ctx
-}
-
-func (t testValidator) Validate(_ P.UnitFile) []V.ValidationError {
-	return nil
-}
-
-func newTestValidator(options V.Options, files ...string) V.Validator {
-	units := make([]P.UnitFile, 0, len(files))
-	for _, file := range files {
-		units = append(units, P.UnitFile{Filename: file})
-	}
-	return testValidator{ctx: V.Context{
-		Options:      options,
-		AllUnitFiles: units,
-	}}
 }

@@ -104,6 +104,25 @@ func multiResult(values []UnitValue) (LookupResult, bool) {
 	return LookupResult{Values: values}, len(values) > 0
 }
 
+func multi(fn SingleLookupFn) LookupFn {
+	return func(unit *UnitFile, field model.Field) []UnitValue {
+		val, _ := fn(unit, field)
+		return []UnitValue{val}
+	}
+}
+
+type SingleLookupFn = func(*UnitFile, model.Field) (UnitValue, bool)
+type LookupFn = func(*UnitFile, model.Field) []UnitValue
+
+var lookupFuncs = map[lookup.LookupFunc]LookupFn{
+	lookup.Lookup:                   multi((*UnitFile).lookupBase),
+	lookup.LookupLast:               multi((*UnitFile).lookupLast),
+	lookup.LookupLastRaw:            multi((*UnitFile).lookupLastRaw),
+	lookup.LookupBoolean:            multi((*UnitFile).lookupBoolean),
+	lookup.LookupBooleanWithDefault: multi((*UnitFile).lookupBoolean),
+}
+
+// TODO: map LookupFunc to lookup functions using a map
 func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
 	if field.Multiple() {
 		return f.lookupMultiple(field)
@@ -274,7 +293,7 @@ func (f *UnitFile) ensureGroup(groupName string) *unitGroup {
 }
 
 func lineIsComment(line string) bool {
-	return len(line) == 0 || line[0] == '#' || line[0] == ':'
+	return len(line) == 0 || line[0] == '#' || line[0] == ';'
 }
 
 func lineIsGroup(line string) bool {
