@@ -96,18 +96,12 @@ func (r *LookupResult) Value() *UnitValue {
 	return &r.Values[0]
 }
 
-func singleResult(value UnitValue) LookupResult {
-	return LookupResult{Values: []UnitValue{value}}
-}
-
-func multiResult(values []UnitValue) (LookupResult, bool) {
-	return LookupResult{Values: values}, len(values) > 0
-}
-
-func multi(fn SingleLookupFn) LookupFn {
+func toMulti(fn SingleLookupFn) LookupFn {
 	return func(unit *UnitFile, field model.Field) []UnitValue {
-		val, _ := fn(unit, field)
-		return []UnitValue{val}
+		if val, ok := fn(unit, field); ok {
+			return []UnitValue{val}
+		}
+		return nil
 	}
 }
 
@@ -115,62 +109,28 @@ type SingleLookupFn = func(*UnitFile, model.Field) (UnitValue, bool)
 type LookupFn = func(*UnitFile, model.Field) []UnitValue
 
 var lookupFuncs = map[lookup.LookupFunc]LookupFn{
-	lookup.Lookup:                   multi((*UnitFile).lookupBase),
-	lookup.LookupLast:               multi((*UnitFile).lookupLast),
-	lookup.LookupLastRaw:            multi((*UnitFile).lookupLastRaw),
-	lookup.LookupBoolean:            multi((*UnitFile).lookupBoolean),
-	lookup.LookupBooleanWithDefault: multi((*UnitFile).lookupBoolean),
+	lookup.Lookup:                   toMulti((*UnitFile).lookupBase),
+	lookup.LookupLast:               toMulti((*UnitFile).lookupLast),
+	lookup.LookupLastRaw:            toMulti((*UnitFile).lookupLastRaw),
+	lookup.LookupBoolean:            toMulti((*UnitFile).lookupBoolean),
+	lookup.LookupBooleanWithDefault: toMulti((*UnitFile).lookupBoolean),
+	lookup.LookupInt:                toMulti((*UnitFile).lookupInt),
+	lookup.LookupUint32:             toMulti((*UnitFile).lookupInt),
+	lookup.LookupAll:                (*UnitFile).lookupAll,
+	lookup.LookupAllRaw:             (*UnitFile).lookupAllRaw,
+	lookup.LookupAllStrv:            (*UnitFile).lookupAllStrv,
+	lookup.LookupAllArgs:            (*UnitFile).lookupAllArgs,
+	lookup.LookupAllKeyVal:          (*UnitFile).lookupAllKeyVal,
+	lookup.LookupLastArgs:           (*UnitFile).lookupLastArgs,
 }
 
-// TODO: map LookupFunc to lookup functions using a map
 func (f *UnitFile) Lookup(field model.Field) (LookupResult, bool) {
-	if field.Multiple() {
-		return f.lookupMultiple(field)
-	} else {
-		return f.lookupSingle(field)
+	if fn, ok := lookupFuncs[field.LookupFunc]; ok {
+		values := fn(f, field)
+		return LookupResult{Values: values}, len(values) > 0
 	}
-}
 
-func (f *UnitFile) lookupSingle(field model.Field) (LookupResult, bool) {
-	var val UnitValue
-	var ok bool
-	switch field.LookupFunc {
-	case lookup.Lookup:
-		val, ok = f.lookupBase(field)
-	case lookup.LookupLast:
-		val, ok = f.lookupLast(field)
-	case lookup.LookupLastRaw:
-		val, ok = f.lookupLastRaw(field)
-	case lookup.LookupBoolean, lookup.LookupBooleanWithDefault:
-		val, ok = f.lookupBoolean(field)
-	case lookup.LookupInt, lookup.LookupUint32:
-		val, ok = f.lookupInt(field)
-	default:
-		panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
-	}
-	return singleResult(val), ok
-}
-
-func (f *UnitFile) lookupMultiple(field model.Field) (LookupResult, bool) {
-	var vals []UnitValue
-	switch field.LookupFunc {
-	case lookup.LookupAll:
-		vals = f.lookupAll(field)
-	case lookup.LookupAllRaw:
-		vals = f.lookupAllRaw(field)
-	case lookup.LookupAllStrv:
-		vals = f.lookupAllStrv(field)
-	case lookup.LookupAllArgs:
-		vals = f.lookupAllArgs(field)
-	case lookup.LookupAllKeyVal:
-		vals = f.lookupAllKeyVal(field)
-	case lookup.LookupLastArgs:
-		vals = f.lookupLastArgs(field)
-	default:
-		panic(fmt.Sprintf("lookup mode %s is not supported for field %s which can have multiple values",
-			field.LookupFunc.Name, field.Key))
-	}
-	return multiResult(vals)
+	panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))
 }
 
 type UnitFileParser struct {
@@ -185,18 +145,22 @@ type ParsingError struct {
 	message string
 	Line    int
 	Column  int
+	Group   string
+	Key     string
 }
 
-func newParsingError(line int, column int, message string) *ParsingError {
+func newParsingError(line int, column int, group, key, message string) *ParsingError {
 	return &ParsingError{
 		message: message,
 		Line:    line,
 		Column:  column,
+		Group:   group,
+		Key:     key,
 	}
 }
 
-func newParsingErrorAtLine(line int, message string) *ParsingError {
-	return newParsingError(line, 0, message)
+func newParsingErrorAtLine(line int, group, key, message string) *ParsingError {
+	return newParsingError(line, 0, group, key, message)
 }
 
 func (e *ParsingError) Error() string {
@@ -383,7 +347,7 @@ func (p *UnitFileParser) parseGroup(line string) *ParsingError {
 	groupName := line[1:end]
 
 	if valid, badIndex := groupNameIsValid(groupName); !valid {
-		return newParsingError(p.lineNr, badIndex+1, "invalid group name: "+groupName)
+		return newParsingError(p.lineNr, badIndex+1, p.currentGroup.name, "", "invalid group name: "+groupName)
 	}
 
 	p.currentGroup = p.file.ensureGroup(groupName)
@@ -393,7 +357,7 @@ func (p *UnitFileParser) parseGroup(line string) *ParsingError {
 
 func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	if p.currentGroup == nil {
-		return newParsingErrorAtLine(p.lineNr, "key file does not start with a group")
+		return newParsingErrorAtLine(p.lineNr, "", "", "key file does not start with a group")
 	}
 
 	keyEnd := strings.Index(line, "=")
@@ -405,7 +369,7 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	}
 	key := line[:keyEnd]
 	if valid, badIndex := keyNameIsValid(key); !valid {
-		return newParsingError(p.lineNr, badIndex, "invalid key name: "+key)
+		return newParsingError(p.lineNr, badIndex, p.currentGroup.name, key, "invalid key name: "+key)
 	}
 
 	// Pull the value from the line (chugging leading whitespace)
@@ -417,7 +381,8 @@ func (p *UnitFileParser) parseKeyValuePair(line string) *ParsingError {
 	value := line[valueStart:]
 
 	if len(value) == 0 {
-		return newParsingError(p.lineNr, valueStart, fmt.Sprintf("key '%s' has an empty value", key))
+		return newParsingError(p.lineNr, valueStart, p.currentGroup.name, key,
+			fmt.Sprintf("key '%s' in group '%s' has an empty value", key, p.currentGroup.name))
 	}
 
 	p.currentGroup.add(key, UnitValue{
@@ -437,7 +402,7 @@ func (p *UnitFileParser) parseLine(line string) *ParsingError {
 	case lineIsKeyValuePair(line):
 		return p.parseKeyValuePair(line)
 	default:
-		return newParsingErrorAtLine(p.lineNr, fmt.Sprintf("“%s” is not a key-value pair or group", line))
+		return newParsingErrorAtLine(p.lineNr, p.currentGroup.name, "", fmt.Sprintf("“%s” is not a key-value pair or group", line))
 	}
 }
 
@@ -461,7 +426,7 @@ func trimSpacesFromLines(data string) string {
 func (f *UnitFile) Parse(data string) []ParsingError {
 	p := &UnitFileParser{
 		file:   f,
-		lineNr: 1,
+		lineNr: 0,
 	}
 
 	data = trimSpacesFromLines(data)
@@ -469,30 +434,26 @@ func (f *UnitFile) Parse(data string) []ParsingError {
 	parsingErrors := make([]ParsingError, 0)
 	for len(data) > 0 {
 		origdata := data
-		nLines := 1
 		var line string
 		line, data = nextLine(data, 0)
-
-		if !lineIsComment(line) {
-			// Handle multi-line continuations
-			// Note: This doesn't support comments in the middle of the continuation, which systemd does
-			if lineIsKeyValuePair(line) {
-				for len(data) > 0 && line[len(line)-1] == '\\' {
-					line, data = nextLine(origdata, len(line)+1)
-					nLines++
-				}
-			}
-		}
+		p.lineNr++
 
 		if lineIsComment(line) {
 			continue
 		}
 
+		// Handle multi-line continuations
+		// Note: This doesn't support comments in the middle of the continuation, which systemd does
+		if lineIsKeyValuePair(line) {
+			for len(data) > 0 && line[len(line)-1] == '\\' {
+				line, data = nextLine(origdata, len(line)+1)
+				p.lineNr++
+			}
+		}
+
 		if err := p.parseLine(line); err != nil {
 			parsingErrors = append(parsingErrors, *err)
 		}
-
-		p.lineNr += nLines
 	}
 
 	if p.currentGroup == nil {
