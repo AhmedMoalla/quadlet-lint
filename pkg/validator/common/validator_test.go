@@ -22,28 +22,23 @@ Other=bla
 dazdaz=dadazdazd
 `
 
+var validator = Validator()
+
 func TestCommonValidator_Validate(t *testing.T) {
 	unit := testutils.ParseString(t, unitFileToTest)
 
-	validator := Validator()
 	errs := validator.Validate(unit)
 	assert.Len(t, errs, 3)
 
-	err := errs[0]
-	assert.Equal(t, validator.Name(), err.ValidatorName)
-	assert.Equal(t, V.UnknownKey, err.ErrorType)
-	assert.Equal(t, 0, err.Column)
-	assert.Equal(t, 4, err.Line, err.Message)
+	expectedErrLines := []int{4, 7, 8}
+	for i, err := range errs {
+		assertUnknownKeyError(t, err, expectedErrLines[i])
+	}
+}
 
-	err = errs[1]
+func assertUnknownKeyError(t *testing.T, err V.ValidationError, line int) {
 	assert.Equal(t, validator.Name(), err.ValidatorName)
 	assert.Equal(t, V.UnknownKey, err.ErrorType)
 	assert.Equal(t, 0, err.Column)
-	assert.Equal(t, 7, err.Line, err.Message)
-
-	err = errs[2]
-	assert.Equal(t, validator.Name(), err.ValidatorName)
-	assert.Equal(t, V.UnknownKey, err.ErrorType)
-	assert.Equal(t, 0, err.Column)
-	assert.Equal(t, 8, err.Line, err.Message)
+	assert.Equal(t, line, err.Line, err.Message)
 }
