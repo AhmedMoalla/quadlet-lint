@@ -505,9 +505,9 @@ func (f *UnitFile) ListKeys(groupName string) []UnitKey {
 
 	hash := make(map[string]struct{})
 	keys := make([]UnitKey, 0, len(g.lines))
-	for lineNumber, line := range g.lines {
+	for _, line := range g.lines {
 		if _, ok := hash[line.key]; !ok {
-			keys = append(keys, UnitKey{Key: line.key, Line: lineNumber + 1})
+			keys = append(keys, UnitKey{Key: line.key, Line: line.value.Line})
 			hash[line.key] = struct{}{}
 		}
 	}
