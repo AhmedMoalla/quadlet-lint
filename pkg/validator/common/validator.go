@@ -33,15 +33,10 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 
 		allowedFields := model.Fields[group]
 		for _, key := range unit.ListKeys(group) {
+			// TODO: Bad key.Line
 			if _, ok := allowedFields[key.Key]; !ok {
 				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, key.Line, 0,
 					fmt.Sprintf("key '%s' is not allowed in group '%s'", key.Key, group)))
-				continue
-			}
-
-			if res, ok := unit.Lookup(allowedFields[key.Key]); ok && len(res.Values) == 0 {
-				validationErrors = append(validationErrors, *V.Err(v.Name(), V.EmptyValue, key.Line, 0,
-					fmt.Sprintf("key '%s' in group '%s' has an empty value", key.Key, group)))
 			}
 		}
 	}

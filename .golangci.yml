@@ -22,6 +22,9 @@ linters:
     - maintidx
 linters-settings:
   exhaustive:
+    check:
+      - map
+      - switch
     default-signifies-exhaustive: true
   staticcheck:
     checks:
