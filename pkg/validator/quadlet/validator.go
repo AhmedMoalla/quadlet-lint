@@ -1,7 +1,7 @@
 package quadlet
 
 import (
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
@@ -11,7 +11,7 @@ var (
 	AmbiguousImageName = validator.NewErrorType("ambiguous-image-name", validator.LevelWarning)
 )
 
-func Validator(units []parser.UnitFile, options validator.Options) validator.Validator {
+func Validator(units []model.UnitFile, options validator.Options) validator.Validator {
 	context := validator.Context{
 		AllUnitFiles: units,
 		Options:      options,
@@ -19,14 +19,14 @@ func Validator(units []parser.UnitFile, options validator.Options) validator.Val
 	return quadletValidator{
 		name:    ValidatorName,
 		context: context,
-		validators: map[parser.UnitType]validator.Validator{
-			parser.UnitTypeContainer: containerValidator{name: "container", context: context},
-			parser.UnitTypeVolume:    noOpValidator{},
-			parser.UnitTypeKube:      noOpValidator{},
-			parser.UnitTypeNetwork:   noOpValidator{},
-			parser.UnitTypeImage:     noOpValidator{},
-			parser.UnitTypeBuild:     noOpValidator{},
-			parser.UnitTypePod:       noOpValidator{},
+		validators: map[model.UnitType]validator.Validator{
+			model.UnitTypeContainer: containerValidator{name: "container", context: context},
+			model.UnitTypeVolume:    noOpValidator{},
+			model.UnitTypeKube:      noOpValidator{},
+			model.UnitTypeNetwork:   noOpValidator{},
+			model.UnitTypeImage:     noOpValidator{},
+			model.UnitTypeBuild:     noOpValidator{},
+			model.UnitTypePod:       noOpValidator{},
 		},
 	}
 }
@@ -34,7 +34,7 @@ func Validator(units []parser.UnitFile, options validator.Options) validator.Val
 type quadletValidator struct {
 	name       string
 	context    validator.Context
-	validators map[parser.UnitType]validator.Validator
+	validators map[model.UnitType]validator.Validator
 }
 
 func (v quadletValidator) Name() string {
@@ -45,8 +45,8 @@ func (v quadletValidator) Context() validator.Context {
 	return v.context
 }
 
-func (v quadletValidator) Validate(unit parser.UnitFile) []validator.ValidationError {
-	return v.validators[unit.UnitType].Validate(unit)
+func (v quadletValidator) Validate(unit model.UnitFile) []validator.ValidationError {
+	return v.validators[unit.UnitType()].Validate(unit)
 }
 
 type noOpValidator struct{}
@@ -59,6 +59,6 @@ func (v noOpValidator) Context() validator.Context {
 	return validator.Context{}
 }
 
-func (v noOpValidator) Validate(parser.UnitFile) []validator.ValidationError {
+func (v noOpValidator) Validate(model.UnitFile) []validator.ValidationError {
 	return []validator.ValidationError{}
 }

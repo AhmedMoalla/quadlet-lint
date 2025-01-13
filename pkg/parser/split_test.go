@@ -9,22 +9,22 @@ import (
 func TestSplitValueAppend(t *testing.T) {
 	t.Parallel()
 
-	values := make([]UnitValue, 0)
-	value := UnitValue{
-		Key:    "TestKey",
-		Value:  "TestValue     TestValue2    TestValue3",
-		Line:   10,
-		Column: 5,
+	values := make([]unitValue, 0)
+	value := unitValue{
+		key:         "TestKey",
+		value:       "TestValue     TestValue2    TestValue3",
+		line:        10,
+		valueColumn: 5,
 	}
 	values, err := splitValueAppend(values, value, WhitespaceSeparators, SplitRelax)
 	if err != nil {
 		t.Errorf("Error happened while calling splitValueAppend: %s", err)
 	}
 
-	expectedValues := []UnitValue{
-		{Key: "TestKey", Value: "TestValue", Line: 10, Column: 5},
-		{Key: "TestKey", Value: "TestValue2", Line: 10, Column: 19},
-		{Key: "TestKey", Value: "TestValue3", Line: 10, Column: 33},
+	expectedValues := []unitValue{
+		{key: "TestKey", value: "TestValue", line: 10, valueColumn: 5},
+		{key: "TestKey", value: "TestValue2", line: 10, valueColumn: 19},
+		{key: "TestKey", value: "TestValue3", line: 10, valueColumn: 33},
 	}
 
 	assert.Equal(t, expectedValues, values)

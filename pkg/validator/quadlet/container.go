@@ -3,10 +3,10 @@ package quadlet
 import (
 	"regexp"
 
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
-	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
@@ -29,30 +29,30 @@ var (
 	networkRegexp        = regexp.MustCompile(`^[^:]+(:(?:\w+=[^,]+,?)+$)*`)
 )
 
-func (v containerValidator) Validate(unit P.UnitFile) []V.ValidationError {
+func (v containerValidator) Validate(unit M.UnitFile) []V.ValidationError {
 	return CheckRules(v, unit, Groups{
 		Container: GContainer{
 			Rootfs: Rules(
 				RequiredIfNotPresent(Image),
 				ConflictsWith(Image),
-				CanReference(P.UnitTypeImage, P.UnitTypeBuild),
+				CanReference(M.UnitTypeImage, M.UnitTypeBuild),
 			),
 			Image: Rules(
 				ImageNotAmbiguous,
 				RequiredIfNotPresent(Rootfs),
 				ConflictsWith(Rootfs),
-				CanReference(P.UnitTypeImage, P.UnitTypeBuild),
+				CanReference(M.UnitTypeImage, M.UnitTypeBuild),
 			),
 			Network: Rules(
-				CanReference(P.UnitTypeNetwork, P.UnitTypeContainer),
+				CanReference(M.UnitTypeNetwork, M.UnitTypeContainer),
 				MatchRegexp(networkRegexp),
 				HaveFormat(NetworkFormat),
 			),
-			Volume: Rules(CanReference(P.UnitTypeVolume)),
-			Mount:  Rules(CanReference(P.UnitTypeVolume)),
+			Volume: Rules(CanReference(M.UnitTypeVolume)),
+			Mount:  Rules(CanReference(M.UnitTypeVolume)),
 			Pod: Rules(
-				HasSuffix(P.UnitTypePod.Ext),
-				CanReference(P.UnitTypePod),
+				HasSuffix(M.UnitTypePod.Ext),
+				CanReference(M.UnitTypePod),
 			),
 			Group: Rules(DependsOn(User)),
 			RemapUid: Rules(

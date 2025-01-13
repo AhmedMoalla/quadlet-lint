@@ -3,11 +3,12 @@ package testutils
 import (
 	"testing"
 
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
-func ParseString(t *testing.T, content string) P.UnitFile {
+func ParseString(t *testing.T, content string) M.UnitFile {
 	t.Helper()
 	unit, errs := P.ParseUnitFileString("test.container", content)
 	if len(errs) != 0 {
@@ -17,7 +18,7 @@ func ParseString(t *testing.T, content string) P.UnitFile {
 		t.Fatal("errors while parsing file content")
 	}
 
-	return *unit
+	return unit
 }
 
 type testValidator struct {
@@ -32,17 +33,53 @@ func (t testValidator) Context() V.Context {
 	return t.ctx
 }
 
-func (t testValidator) Validate(_ P.UnitFile) []V.ValidationError {
+func (t testValidator) Validate(_ M.UnitFile) []V.ValidationError {
 	return nil
 }
 
 func NewTestValidator(options V.Options, files ...string) V.Validator {
-	units := make([]P.UnitFile, 0, len(files))
+	units := make([]M.UnitFile, 0, len(files))
 	for _, file := range files {
-		units = append(units, P.UnitFile{Filename: file})
+		units = append(units, testUnitFile{filename: file})
 	}
 	return testValidator{ctx: V.Context{
 		Options:      options,
 		AllUnitFiles: units,
 	}}
+}
+
+type testUnitFile struct {
+	filename string
+}
+
+func (t testUnitFile) FileName() string {
+	return t.filename
+}
+
+func (t testUnitFile) UnitType() M.UnitType {
+	panic("implement me")
+}
+
+func (t testUnitFile) Lookup(field M.Field) (M.LookupResult, bool) {
+	panic("implement me")
+}
+
+func (t testUnitFile) HasGroup(groupName string) bool {
+	panic("implement me")
+}
+
+func (t testUnitFile) ListGroups() []string {
+	panic("implement me")
+}
+
+func (t testUnitFile) ListKeys(groupName string) []M.UnitKey {
+	panic("implement me")
+}
+
+func (t testUnitFile) HasKey(field M.Field) bool {
+	panic("implement me")
+}
+
+func (t testUnitFile) HasValue(field M.Field) bool {
+	panic("implement me")
 }

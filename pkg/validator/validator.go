@@ -4,20 +4,19 @@ import (
 	"fmt"
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 )
 
-type Rule = func(validator Validator, unit parser.UnitFile, field model.Field) []ValidationError
+type Rule = func(validator Validator, unit model.UnitFile, field model.Field) []ValidationError
 
 type Validator interface {
 	Name() string
 	Context() Context
-	Validate(unit parser.UnitFile) []ValidationError
+	Validate(unit model.UnitFile) []ValidationError
 }
 
 type Context struct {
 	Options
-	AllUnitFiles []parser.UnitFile
+	AllUnitFiles []model.UnitFile
 }
 
 type Options struct {

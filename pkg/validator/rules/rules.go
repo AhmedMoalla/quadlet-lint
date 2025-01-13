@@ -9,7 +9,6 @@ import (
 
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
-	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
@@ -23,7 +22,7 @@ func ErrSlice(validatorName string, errType V.ErrorType, line, column int, messa
 	return []V.ValidationError{*V.Err(validatorName, errType, line, column, message)}
 }
 
-func CheckRules(validator V.Validator, unit P.UnitFile, rules model.Groups) []V.ValidationError {
+func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 
 	groupsValue := reflect.ValueOf(rules)
@@ -58,7 +57,7 @@ func CheckRules(validator V.Validator, unit P.UnitFile, rules model.Groups) []V.
 // ================== Rules ==================
 
 func RequiredIfNotPresent(other Field) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		if !unit.HasValue(other) && !unit.HasValue(field) {
 			return ErrSlice(validator.Name(), V.RequiredKey, 0, 0,
 				fmt.Sprintf("at least one of these keys is required: %s, %s", field, other))
@@ -69,12 +68,12 @@ func RequiredIfNotPresent(other Field) V.Rule {
 }
 
 func ConflictsWith(others ...Field) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, other := range others {
 			if unit.HasValue(other) && unit.HasValue(field) {
 				res, _ := unit.Lookup(field)
-				for _, value := range res.Values {
+				for _, value := range res.Values() {
 					validationErrors = append(validationErrors, *V.Err(validator.Name(), V.KeyConflict, value.Line, 0,
 						fmt.Sprintf("the keys %s, %s cannot be specified together", field, other)))
 				}
@@ -85,25 +84,25 @@ func ConflictsWith(others ...Field) V.Rule {
 	}
 }
 
-func CanReference(unitTypes ...P.UnitType) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func CanReference(unitTypes ...UnitType) V.Rule {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		context := validator.Context()
 		if !context.CheckReferences {
 			return nil
 		}
 
 		res, found := unit.Lookup(field)
-		if !found || len(res.Values) == 0 {
+		if !found || len(res.Values()) == 0 {
 			return nil
 		}
 
 		units := context.AllUnitFiles
 		validationErrors := make([]V.ValidationError, 0)
-		for _, value := range res.Values {
+		for _, value := range res.Values() {
 			for _, unitType := range unitTypes {
 				if strings.HasSuffix(value.Value, unitType.Ext) {
-					foundUnit := slices.ContainsFunc(units, func(unit P.UnitFile) bool {
-						return unit.Filename == value.Value
+					foundUnit := slices.ContainsFunc(units, func(unit UnitFile) bool {
+						return unit.FileName() == value.Value
 					})
 
 					if !foundUnit {
@@ -120,14 +119,14 @@ func CanReference(unitTypes ...P.UnitType) V.Rule {
 }
 
 func HaveFormat(format Format) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		res, found := unit.Lookup(field)
 		if !found {
 			return nil
 		}
 
 		validationErrors := make([]V.ValidationError, 0)
-		for _, value := range res.Values {
+		for _, value := range res.Values() {
 			err := format.ParseAndValidate(value.Value)
 			if err != nil {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line,
@@ -140,14 +139,14 @@ func HaveFormat(format Format) V.Rule {
 }
 
 func AllowedValues(allowedValues ...string) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		res, found := unit.Lookup(field)
 		if !found {
 			return nil
 		}
 
 		validationErrors := make([]V.ValidationError, 0)
-		for _, value := range res.Values {
+		for _, value := range res.Values() {
 			if !slices.Contains(allowedValues, value.Value) {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
 					fmt.Sprintf("invalid value '%s' for key '%s'. Allowed values: %s",
@@ -159,14 +158,14 @@ func AllowedValues(allowedValues ...string) V.Rule {
 }
 
 func HasSuffix(suffix string) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		res, found := unit.Lookup(field)
 		if !found {
 			return nil
 		}
 
 		validationErrors := make([]V.ValidationError, 0)
-		for _, value := range res.Values {
+		for _, value := range res.Values() {
 			if !strings.HasSuffix(value.Value, suffix) {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
 					fmt.Sprintf("value '%s' must have suffix '%s'", value.Value, suffix)))
@@ -178,16 +177,16 @@ func HasSuffix(suffix string) V.Rule {
 }
 
 func DependsOn(dependency Field) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		dependencyRes, dependencyFound := unit.Lookup(dependency)
-		dependencyOk := dependencyFound && len(dependencyRes.Values) > 0
+		dependencyOk := dependencyFound && len(dependencyRes.Values()) > 0
 
 		res, found := unit.Lookup(field)
-		fieldOk := found && len(res.Values) > 0
+		fieldOk := found && len(res.Values()) > 0
 
 		validationErrors := make([]V.ValidationError, 0)
 		if !dependencyOk && fieldOk {
-			for _, value := range res.Values {
+			for _, value := range res.Values() {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.UnsatisfiedDependency, value.Line, 0,
 					fmt.Sprintf("value for '%s' was set but it depends on key '%s' which was not found",
 						field, dependency.Key)))
@@ -198,14 +197,14 @@ func DependsOn(dependency Field) V.Rule {
 	}
 }
 
-func Deprecated(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+func Deprecated(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 	res, found := unit.Lookup(field)
 	if !found {
 		return nil
 	}
 
 	validationErrors := make([]V.ValidationError, 0)
-	for _, value := range res.Values {
+	for _, value := range res.Values() {
 		validationErrors = append(validationErrors, *V.Err(validator.Name(), V.DeprecatedKey, value.Line, 0,
 			fmt.Sprintf("key '%s' is deprecated and should not be used", field)))
 	}
@@ -213,14 +212,14 @@ func Deprecated(validator V.Validator, unit P.UnitFile, field Field) []V.Validat
 }
 
 func MatchRegexp(regex *regexp.Regexp) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		res, found := unit.Lookup(field)
 		if !found {
 			return nil
 		}
 
 		validationErrors := make([]V.ValidationError, 0)
-		for _, value := range res.Values {
+		for _, value := range res.Values() {
 			if !regex.MatchString(value.Value) {
 				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
 					fmt.Sprintf("Must match regexp '%s'", regex.String())))
@@ -231,17 +230,17 @@ func MatchRegexp(regex *regexp.Regexp) V.Rule {
 }
 
 func ValuesMust(valuesPredicate ValuesValidator, rulePredicate RulePredicate, messageAndArgs ...any) V.Rule {
-	return func(validator V.Validator, unit P.UnitFile, field Field) []V.ValidationError {
+	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		if !rulePredicate(validator, unit, field) {
 			return nil
 		}
 
 		if res, ok := unit.Lookup(field); ok {
-			if err := valuesPredicate(validator, field, res.Values); err != nil {
+			if err := valuesPredicate(validator, field, res.Values()); err != nil {
 				errorMsg := buildErrorMessage(messageAndArgs, err)
 				var line, column int
-				if len(res.Values) > 0 {
-					firstValue := res.Values[0]
+				if len(res.Values()) > 0 {
+					firstValue := res.Values()[0]
 					line = firstValue.Line
 					column = firstValue.Column
 				}
@@ -275,10 +274,10 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 
 // ================== ValuesValidators ==================
 
-type ValuesValidator func(validator V.Validator, field Field, values []P.UnitValue) *V.ValidationError
-type RulePredicate func(validator V.Validator, unit P.UnitFile, field Field) bool
+type ValuesValidator func(validator V.Validator, field Field, values []UnitValue) *V.ValidationError
+type RulePredicate func(validator V.Validator, unit UnitFile, field Field) bool
 
-func HaveZeroOrOneValues(validator V.Validator, _ Field, values []P.UnitValue) *V.ValidationError {
+func HaveZeroOrOneValues(validator V.Validator, _ Field, values []UnitValue) *V.ValidationError {
 	if len(values) > 1 {
 		value := values[1]
 		return V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column, "should have exactly zero or one value")
@@ -288,9 +287,9 @@ func HaveZeroOrOneValues(validator V.Validator, _ Field, values []P.UnitValue) *
 }
 
 func WhenFieldEquals(conditionField Field, conditionValues ...string) RulePredicate {
-	return func(_ V.Validator, unit P.UnitFile, _ Field) bool {
+	return func(_ V.Validator, unit UnitFile, _ Field) bool {
 		if res, ok := unit.Lookup(conditionField); ok {
-			for _, fieldValue := range res.Values {
+			for _, fieldValue := range res.Values() {
 				for _, conditionValue := range conditionValues {
 					if fieldValue.Value == conditionValue {
 						return true

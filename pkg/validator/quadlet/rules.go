@@ -7,7 +7,6 @@ import (
 
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
-	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	R "github.com/AhmedMoalla/quadlet-lint/pkg/validator/rules"
 )
@@ -17,7 +16,7 @@ import (
 var NetworkFormat = R.Format{
 	Name: "Network", ValueSeparator: ":", OptionsSeparator: ",",
 	ValidateOptions: func(value string, options map[string]string) error {
-		if strings.HasSuffix(value, P.UnitTypeContainer.Ext) && len(options) > 0 {
+		if strings.HasSuffix(value, M.UnitTypeContainer.Ext) && len(options) > 0 {
 			return fmt.Errorf("'%s' is invalid because extra options are not supported when "+
 				"joining another container's network", value)
 		}
@@ -29,7 +28,7 @@ var NetworkFormat = R.Format{
 
 var ConflictsWithNewUserMappingKeys = R.ConflictsWith(UserNS, UIDMap, GIDMap, SubUIDMap, SubGIDMap)
 
-func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field M.Field) []V.ValidationError {
+func ImageNotAmbiguous(validator V.Validator, unit M.UnitFile, field M.Field) []V.ValidationError {
 	if field.Key != Image.Key {
 		return nil
 	}
@@ -38,17 +37,22 @@ func ImageNotAmbiguous(validator V.Validator, unit P.UnitFile, field M.Field) []
 	if !found {
 		return nil
 	}
-	value := res.Value()
+
+	value, ok := res.Value()
+	if !ok {
+		return R.ErrSlice(validator.Name(), V.InvalidValue, value.Line, value.Column, "value not found")
+	}
+
 	imageName := value.Value
 
-	if strings.HasSuffix(imageName, P.UnitTypeBuild.Ext) || strings.HasSuffix(imageName, P.UnitTypeImage.Ext) {
+	if strings.HasSuffix(imageName, M.UnitTypeBuild.Ext) || strings.HasSuffix(imageName, M.UnitTypeImage.Ext) {
 		return nil
 	}
 
 	if !isUnambiguousName(imageName) {
 		message := fmt.Sprintf("%s specifies the image \"%s\" which not a fully qualified image name. "+
 			"This is not ideal for performance and security reasons. "+
-			"See the podman-pull manpage discussion of short-name-aliases.conf for details.", unit.Filename, imageName)
+			"See the podman-pull manpage discussion of short-name-aliases.conf for details.", unit.FileName(), imageName)
 		return R.ErrSlice(validator.Name(), AmbiguousImageName, value.Line, value.Column, message)
 	}
 

@@ -19,6 +19,8 @@ var (
 )
 
 func TestValidationErrors_WhereLevel(t *testing.T) {
+	t.Parallel()
+
 	errs := make(ValidationErrors)
 	errs["test.go"] = append(errLevel, warnLevel...)
 
@@ -27,6 +29,8 @@ func TestValidationErrors_WhereLevel(t *testing.T) {
 }
 
 func TestValidationErrors_HasErrors(t *testing.T) {
+	t.Parallel()
+
 	errs := make(ValidationErrors)
 	errs["test.go"] = append(errLevel, warnLevel...)
 
@@ -41,6 +45,8 @@ func TestValidationErrors_HasErrors(t *testing.T) {
 }
 
 func TestValidationErrors_AddError(t *testing.T) {
+	t.Parallel()
+
 	errs := make(ValidationErrors)
 	errs["test.go"] = append(errs["test.go"], errLevel...)
 
@@ -51,6 +57,8 @@ func TestValidationErrors_AddError(t *testing.T) {
 }
 
 func TestValidationErrors_Merge(t *testing.T) {
+	t.Parallel()
+
 	errs1 := make(ValidationErrors)
 	errs1.AddError("test.go", errLevel...)
 

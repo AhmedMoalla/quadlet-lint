@@ -427,10 +427,10 @@ finishForceNext:
 	return s.String(), in[p:], true, nil
 }
 
-func splitValueAppend(appendTo []UnitValue, u UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
+func splitValueAppend(appendTo []unitValue, u unitValue, separators string, flags SplitFlags) ([]unitValue, error) {
 	orig := appendTo
-	s := u.Value
-	column := u.Column
+	s := u.value
+	column := u.valueColumn
 	for {
 		word, remaining, moreWords, err := extractFirstWord(s, separators, flags|SplitRetainSeparators)
 		if err != nil {
@@ -440,11 +440,11 @@ func splitValueAppend(appendTo []UnitValue, u UnitValue, separators string, flag
 		if !moreWords {
 			break
 		}
-		appendTo = append(appendTo, UnitValue{
-			Key:    u.Key,
-			Value:  word,
-			Line:   u.Line,
-			Column: column,
+		appendTo = append(appendTo, unitValue{
+			key:         u.key,
+			value:       word,
+			line:        u.line,
+			valueColumn: column,
 		})
 		s = remaining
 		for _, char := range remaining {
@@ -458,6 +458,6 @@ func splitValueAppend(appendTo []UnitValue, u UnitValue, separators string, flag
 	return appendTo, nil
 }
 
-func splitString(s UnitValue, separators string, flags SplitFlags) ([]UnitValue, error) {
-	return splitValueAppend(make([]UnitValue, 0), s, separators, flags)
+func splitString(s unitValue, separators string, flags SplitFlags) ([]unitValue, error) {
+	return splitValueAppend(make([]unitValue, 0), s, separators, flags)
 }

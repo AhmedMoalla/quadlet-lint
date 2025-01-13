@@ -9,6 +9,8 @@ import (
 )
 
 func TestFormat_ParseAndValidate(t *testing.T) {
+	t.Parallel()
+
 	format := Format{
 		Name:             "TestFormat",
 		ValueSeparator:   "@",

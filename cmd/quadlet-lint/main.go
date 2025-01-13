@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/validator/common"
@@ -78,13 +79,13 @@ var ParsingError = validator.ErrorType{
 	ValidatorName: "parser",
 }
 
-func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.ValidationErrors) {
+func parseUnitFiles(unitFilesPaths []string) ([]model.UnitFile, validator.ValidationErrors) {
 	errors := make(validator.ValidationErrors)
-	unitFiles := make([]parser.UnitFile, 0, len(unitFilesPaths))
+	unitFiles := make([]model.UnitFile, 0, len(unitFilesPaths))
 	for _, path := range unitFilesPaths {
 		unitFile, errs := parser.ParseUnitFile(path)
 		if unitFile != nil {
-			unitFiles = append(unitFiles, *unitFile)
+			unitFiles = append(unitFiles, unitFile)
 		}
 
 		for _, err := range errs {
@@ -94,7 +95,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]parser.UnitFile, validator.Valid
 	return unitFiles, errors
 }
 
-func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) validator.ValidationErrors {
+func validateUnitFiles(unitFiles []model.UnitFile, checkReferences bool) validator.ValidationErrors {
 	validationErrors := make(validator.ValidationErrors)
 	validators := []validator.Validator{
 		common.Validator(),
@@ -103,7 +104,7 @@ func validateUnitFiles(unitFiles []parser.UnitFile, checkReferences bool) valida
 
 	for _, file := range unitFiles {
 		for _, vtor := range validators {
-			validationErrors.AddError(file.Filename, vtor.Validate(file)...)
+			validationErrors.AddError(file.FileName(), vtor.Validate(file)...)
 		}
 	}
 	return validationErrors
@@ -145,13 +146,13 @@ func isDir(path string) bool {
 }
 
 var supportedExtensions = []string{
-	parser.UnitTypeContainer.Ext,
-	parser.UnitTypeVolume.Ext,
-	parser.UnitTypeKube.Ext,
-	parser.UnitTypeNetwork.Ext,
-	parser.UnitTypeImage.Ext,
-	parser.UnitTypeBuild.Ext,
-	parser.UnitTypePod.Ext,
+	model.UnitTypeContainer.Ext,
+	model.UnitTypeVolume.Ext,
+	model.UnitTypeKube.Ext,
+	model.UnitTypeNetwork.Ext,
+	model.UnitTypeImage.Ext,
+	model.UnitTypeBuild.Ext,
+	model.UnitTypePod.Ext,
 }
 
 func getAllUnitFiles(rootDirectory string) []string {
