@@ -12,7 +12,7 @@ import (
 func TestUnitFile_HasGroup(t *testing.T) {
 	t.Parallel()
 
-	unit, errors := ParseUnitFile("testdata/httpbin.container")
+	unit, errors := ParseUnitFile("testdata/unit.container")
 	require.Empty(t, errors)
 	assert.True(t, unit.HasGroup("Container"))
 	assert.False(t, unit.HasGroup("Pod"))
@@ -21,7 +21,7 @@ func TestUnitFile_HasGroup(t *testing.T) {
 func TestUnitFile_ListGroups(t *testing.T) {
 	t.Parallel()
 
-	unit, errors := ParseUnitFile("testdata/httpbin.container")
+	unit, errors := ParseUnitFile("testdata/unit.container")
 	require.Empty(t, errors)
 	assert.ElementsMatch(t, []string{"Container", "Service", "Install"}, unit.ListGroups())
 }
@@ -29,7 +29,7 @@ func TestUnitFile_ListGroups(t *testing.T) {
 func TestUnitFile_ListKeys(t *testing.T) {
 	t.Parallel()
 
-	unit, errors := ParseUnitFile("testdata/httpbin.container")
+	unit, errors := ParseUnitFile("testdata/unit.container")
 	require.Empty(t, errors)
 
 	expectedKeys := []model.UnitKey{
@@ -37,7 +37,10 @@ func TestUnitFile_ListKeys(t *testing.T) {
 		{Key: "Image", Line: 3},
 		{Key: "PublishPort", Line: 4},
 		{Key: "Network", Line: 6},
-		{Key: "Environment", Line: 7},
+		{Key: "Environment", Line: 8},
+		{Key: "ReadOnly", Line: 12},
+		{Key: "EnvironmentFile", Line: 14},
+		{Key: "Exec", Line: 18},
 	}
 	assert.ElementsMatch(t, expectedKeys, unit.ListKeys("Container"))
 }

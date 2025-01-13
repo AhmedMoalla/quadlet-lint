@@ -1,15 +1,27 @@
 [Container]
-ContainerName=httpbin
-Image=docker.io/kennethreitz/httpbin
+ContainerName=my-container
+Image=my-image
 PublishPort=8080:8080/tcp
 ; another comment
 Network   =    my-network
+# LookupAllKeyVal
 Environment=env1=value1 \
     env2=value2
+
+# LookupBoolean
+ReadOnly=true
+# LookupAllArgs
+EnvironmentFile=env1 env2
+EnvironmentFile=env3
+
+# LookupLastArgs
+Exec=ignored
+Exec=value
 
 # A comment
 [Service]
 Restart=always
+# LookupUint32
 TimeoutStartSec=900
 
 [Install]

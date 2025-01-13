@@ -6,6 +6,7 @@ import (
 
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	generated "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/lookup"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -46,19 +47,56 @@ func TestParseUnitFileErrors(t *testing.T) {
 func TestParseUnitFile(t *testing.T) {
 	t.Parallel()
 
-	file, errors := ParseUnitFile("testdata/httpbin.container")
+	file, errors := ParseUnitFile("testdata/unit.container")
 	assertUnitFileParsedCorrectly(t, file, errors)
 }
 
 func TestParseUnitFileString(t *testing.T) {
 	t.Parallel()
 
-	bytes, err := os.ReadFile("testdata/httpbin.container")
+	bytes, err := os.ReadFile("testdata/unit.container")
 	require.NoError(t, err)
-	file, errors := ParseUnitFileString("httpbin.container", string(bytes))
-	assert.Equal(t, "httpbin.container", file.FileName())
+	file, errors := ParseUnitFileString("unit.container", string(bytes))
+	assert.Equal(t, "unit.container", file.FileName())
 	assert.Equal(t, UnitTypeContainer, file.UnitType())
 	assertUnitFileParsedCorrectly(t, file, errors)
+}
+
+var expectedGroups = map[string]map[string][]UnitValue{
+	"Container": {
+		container.Image.Key:       {UnitValue{Key: container.Image.Key, Value: "my-image", Line: 3, Column: 6}},
+		container.PublishPort.Key: {UnitValue{Key: container.PublishPort.Key, Value: "8080:8080/tcp", Line: 4, Column: 12}},
+		container.Network.Key:     {UnitValue{Key: container.Network.Key, Value: "my-network", Line: 6, Column: 15}},
+		container.Environment.Key: {
+			UnitValue{Key: "env1", Value: "value1", Line: 8, Column: 12},
+			UnitValue{Key: "env2", Value: "value2", Line: 8, Column: 12}},
+		container.ReadOnly.Key: {UnitValue{Key: container.ReadOnly.Key, Value: "true", Line: 12, Column: 9}},
+		container.EnvironmentFile.Key: {
+			UnitValue{Key: container.EnvironmentFile.Key, Value: "env1", Line: 14, Column: 16},
+			UnitValue{Key: container.EnvironmentFile.Key, Value: "env2", Line: 14, Column: 21},
+			UnitValue{Key: container.EnvironmentFile.Key, Value: "env3", Line: 15, Column: 16},
+		},
+		container.Exec.Key: {UnitValue{Key: container.Exec.Key, Value: "value", Line: 19, Column: 5}},
+	},
+	"Service": {
+		"Restart":         {UnitValue{Key: "Restart", Value: "always", Line: 23, Column: 8}},
+		"TimeoutStartSec": {UnitValue{Key: "TimeoutStartSec", Value: "900", Line: 25, Column: 16}},
+	},
+	"Install": {
+		"WantedBy": {
+			UnitValue{Key: "WantedBy", Value: "multi-user.target", Line: 29, Column: 9},
+			UnitValue{Key: "WantedBy", Value: "default.target", Line: 29, Column: 27}},
+	},
+}
+
+var additionalFields = map[string]map[string]Field{
+	"Service": {
+		"Restart":         Field{Group: "Service", Key: "Restart", LookupFunc: lookup.Lookup},
+		"TimeoutStartSec": Field{Group: "Service", Key: "TimeoutStartSec", LookupFunc: lookup.LookupUint32},
+	},
+	"Install": {
+		"WantedBy": Field{Group: "Install", Key: "WantedBy", LookupFunc: lookup.LookupAllStrv},
+	},
 }
 
 func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []ParsingError) {
@@ -69,35 +107,6 @@ func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []Parsing
 	}
 	assert.Empty(t, errors)
 
-	expectedGroups := map[string]map[string][]UnitValue{
-		"Container": {
-			"Image":       {UnitValue{Key: "Image", Value: "docker.io/kennethreitz/httpbin", Line: 3, Column: 6}},
-			"PublishPort": {UnitValue{Key: "PublishPort", Value: "8080:8080/tcp", Line: 4, Column: 12}},
-			"Network":     {UnitValue{Key: "Network", Value: "my-network", Line: 6, Column: 15}},
-			"Environment": {
-				UnitValue{Key: "env1", Value: "value1", Line: 7, Column: 12},
-				UnitValue{Key: "env2", Value: "value2", Line: 7, Column: 12}},
-		},
-		"Service": {
-			"Restart":         {UnitValue{Key: "Restart", Value: "always", Line: 12, Column: 8}},
-			"TimeoutStartSec": {UnitValue{Key: "TimeoutStartSec", Value: "900", Line: 13, Column: 16}},
-		},
-		"Install": {
-			"WantedBy": {
-				UnitValue{Key: "WantedBy", Value: "multi-user.target", Line: 17, Column: 9},
-				UnitValue{Key: "WantedBy", Value: "default.target", Line: 17, Column: 27}},
-		},
-	}
-
-	additionalFields := map[string]map[string]Field{
-		"Service": {
-			"Restart":         Field{Group: "Service", Key: "Restart", LookupFunc: lookup.Lookup},
-			"TimeoutStartSec": Field{Group: "Service", Key: "TimeoutStartSec", LookupFunc: lookup.LookupUint32},
-		},
-		"Install": {
-			"WantedBy": Field{Group: "Install", Key: "WantedBy", LookupFunc: lookup.LookupAllStrv},
-		},
-	}
 	generated.Fields = utils.MergeMaps(generated.Fields, additionalFields)
 
 	for group, kv := range expectedGroups {
@@ -109,6 +118,14 @@ func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []Parsing
 			assert.ElementsMatch(t, expectedValues, result.Values())
 		}
 	}
+
+	result, ok := file.Lookup(container.ReadOnly)
+	assert.True(t, ok)
+	assert.True(t, result.BoolValue())
+
+	result, ok = file.Lookup(additionalFields["Service"]["TimeoutStartSec"])
+	assert.True(t, ok)
+	assert.Equal(t, 900, result.IntValue())
 }
 
 func TestKeyNameIsValid(t *testing.T) {
