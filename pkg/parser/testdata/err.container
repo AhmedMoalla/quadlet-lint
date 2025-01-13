@@ -1,0 +1,26 @@
+WithoutGroup=test
+
+[Container]
+; Other Empty value
+ContainerName=
+Image=docker.io/kennethreitz/httpbin
+PublishPort=8080:8080/tcp
+Network=my-network
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+# Empty value
+Bla=
+
+[Install]
+# Start by default on boot
+WantedBy=multi-user.target default.target
+# Bad Line
+afaffazf
+
+[]
+Test=value
+
+[Group]
+=value

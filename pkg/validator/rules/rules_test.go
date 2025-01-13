@@ -5,10 +5,10 @@ import (
 	"slices"
 	"testing"
 
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
-	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"github.com/stretchr/testify/assert"
@@ -136,7 +136,7 @@ func TestCanReference(t *testing.T) {
 			[]V.Location{{"", 2, 8}, {"", 4, 8}}},
 	}
 
-	rule := CanReference(P.UnitTypeNetwork, P.UnitTypeContainer)
+	rule := CanReference(M.UnitTypeNetwork, M.UnitTypeContainer)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -412,7 +412,7 @@ func TestHaveZeroOrOneValues(t *testing.T) {
 			unit := testutils.ParseString(t, test.unit)
 			res, _ := unit.Lookup(container.RemapUid)
 
-			if err := HaveZeroOrOneValues(v, container.RemapUid, res.Values); err != nil {
+			if err := HaveZeroOrOneValues(v, container.RemapUid, res.Values()); err != nil {
 				assert.Equal(t, v.Name(), err.ValidatorName)
 				assert.Equal(t, V.InvalidValue, err.ErrorType)
 				if test.error != nil {

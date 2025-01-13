@@ -1,6 +1,6 @@
-package main
+package utils
 
-func reverseMap[K, V comparable](input map[K]V) map[V]K {
+func ReverseMap[K, V comparable](input map[K]V) map[V]K {
 	reversed := make(map[V]K, len(input))
 	for k, v := range input {
 		reversed[v] = k
@@ -8,7 +8,7 @@ func reverseMap[K, V comparable](input map[K]V) map[V]K {
 	return reversed
 }
 
-func mergeMaps[K comparable, V any](m1 map[K]V, m2 map[K]V) map[K]V {
+func MergeMaps[K comparable, V any](m1 map[K]V, m2 map[K]V) map[K]V {
 	merged := make(map[K]V, len(m1)+len(m2))
 	for key, value := range m1 {
 		merged[key] = value

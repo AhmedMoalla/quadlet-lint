@@ -25,6 +25,8 @@ dazdaz=dadazdazd
 var validator = Validator()
 
 func TestCommonValidator_Validate(t *testing.T) {
+	t.Parallel()
+
 	unit := testutils.ParseString(t, unitFileToTest)
 
 	errs := validator.Validate(unit)
@@ -37,6 +39,8 @@ func TestCommonValidator_Validate(t *testing.T) {
 }
 
 func assertUnknownKeyError(t *testing.T, err V.ValidationError, line int) {
+	t.Helper()
+
 	assert.Equal(t, validator.Name(), err.ValidatorName)
 	assert.Equal(t, V.UnknownKey, err.ErrorType)
 	assert.Equal(t, 0, err.Column)

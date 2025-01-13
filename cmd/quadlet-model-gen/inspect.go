@@ -7,6 +7,8 @@ import (
 	"go/types"
 	"strconv"
 	"strings"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 )
 
 type declarations struct {
@@ -116,7 +118,7 @@ func inspectQuadletSourceFileLookupCalls(
 		selector, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
 			if alternativeCalls, ok := inspectAlternativeLookupCalls(call, parentFunc, declarations, lookupFuncs); ok {
-				calls.alternative = mergeMaps(calls.alternative, alternativeCalls)
+				calls.alternative = utils.MergeMaps(calls.alternative, alternativeCalls)
 			}
 
 			return true

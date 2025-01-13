@@ -3,8 +3,8 @@ package common
 import (
 	"fmt"
 
+	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
@@ -24,7 +24,7 @@ func (v commonValidator) Context() V.Context {
 
 var ignoredSystemdGroups = map[string]bool{"Service": true, "Install": true, "Unit": true}
 
-func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
+func (v commonValidator) Validate(unit M.UnitFile) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 	for _, group := range unit.ListGroups() {
 		if _, ignored := ignoredSystemdGroups[group]; ignored {
@@ -33,7 +33,6 @@ func (v commonValidator) Validate(unit parser.UnitFile) []V.ValidationError {
 
 		allowedFields := model.Fields[group]
 		for _, key := range unit.ListKeys(group) {
-			// TODO: Bad key.Line
 			if _, ok := allowedFields[key.Key]; !ok {
 				validationErrors = append(validationErrors, *V.Err(v.Name(), V.UnknownKey, key.Line, 0,
 					fmt.Sprintf("key '%s' is not allowed in group '%s'", key.Key, group)))

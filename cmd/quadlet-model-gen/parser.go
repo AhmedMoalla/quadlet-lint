@@ -6,6 +6,8 @@ import (
 	"go/token"
 	"os"
 	"strings"
+
+	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 )
 
 var keyMapByGroup = map[string]string{
@@ -19,7 +21,7 @@ var keyMapByGroup = map[string]string{
 	"Quadlet":   "supportedQuadletKeys",
 }
 
-var groupByKeyMap = reverseMap(keyMapByGroup)
+var groupByKeyMap = utils.ReverseMap(keyMapByGroup)
 
 // Approximate number of elements present in the source files
 const (
@@ -101,7 +103,7 @@ func parseQuadletSourceFile(file *os.File, lookupFuncs map[string]lookupFunc) (m
 	}
 
 	// Easier this way...
-	fieldsByGroup = mergeMaps(fieldsByGroup, additionalFields)
+	fieldsByGroup = utils.MergeMaps(fieldsByGroup, additionalFields)
 	for group, fields := range fieldsByGroup {
 		for i, field := range fields {
 			if strings.HasPrefix(field.Key, "Health") {

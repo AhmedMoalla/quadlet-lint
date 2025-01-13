@@ -1,0 +1,17 @@
+[Container]
+ContainerName=httpbin
+Image=docker.io/kennethreitz/httpbin
+PublishPort=8080:8080/tcp
+; another comment
+Network   =    my-network
+Environment=env1=value1 \
+    env2=value2
+
+# A comment
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+# Start by default on boot
+WantedBy=multi-user.target default.target
