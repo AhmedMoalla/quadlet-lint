@@ -134,6 +134,7 @@ func (f unitFile) lookupBoolean(field M.Field) (unitValue, bool) {
 		strings.EqualFold(value, "true") ||
 		strings.EqualFold(value, "on")
 	return unitValue{
+		key:         field.Key,
 		value:       strconv.FormatBool(boolValue),
 		boolValue:   boolValue,
 		line:        v.line,
