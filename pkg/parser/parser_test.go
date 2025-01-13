@@ -56,6 +56,8 @@ func TestParseUnitFileString(t *testing.T) {
 	bytes, err := os.ReadFile("testdata/httpbin.container")
 	require.NoError(t, err)
 	file, errors := ParseUnitFileString("httpbin.container", string(bytes))
+	assert.Equal(t, "httpbin.container", file.FileName())
+	assert.Equal(t, UnitTypeContainer, file.UnitType())
 	assertUnitFileParsedCorrectly(t, file, errors)
 }
 
