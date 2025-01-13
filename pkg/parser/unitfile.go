@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
@@ -129,6 +130,7 @@ func (f unitFile) ListKeys(groupName string) []M.UnitKey {
 	keys := make([]M.UnitKey, 0, len(g.lines))
 	for _, line := range g.lines {
 		if _, ok := hash[line.key]; !ok {
+			line.value.line -= strings.Count(line.value.value, "\n")
 			keys = append(keys, M.UnitKey{Key: line.key, Line: line.value.line})
 			hash[line.key] = struct{}{}
 		}
