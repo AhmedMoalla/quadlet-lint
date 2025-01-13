@@ -17,6 +17,8 @@ import (
 var v = testutils.NewTestValidator(V.Options{})
 
 func TestCheckRules(t *testing.T) {
+	t.Parallel()
+
 	unit := testutils.ParseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
 	rules := model.Groups{
 		Container: container.GContainer{
@@ -44,6 +46,8 @@ func TestCheckRules(t *testing.T) {
 }
 
 func TestCheckRulesShouldPanicIfFieldNotGeneratedInModel(t *testing.T) {
+	t.Parallel()
+
 	field := model.Fields["Container"][container.Rootfs.Key]
 	delete(model.Fields["Container"], container.Rootfs.Key)
 	assert.Panics(t, func() {
@@ -53,6 +57,8 @@ func TestCheckRulesShouldPanicIfFieldNotGeneratedInModel(t *testing.T) {
 }
 
 func TestRequiredIfNotPresent(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		unit    string
@@ -86,6 +92,8 @@ func TestRequiredIfNotPresent(t *testing.T) {
 }
 
 func TestConflictsWith(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		unit      string
@@ -120,6 +128,8 @@ func TestConflictsWith(t *testing.T) {
 }
 
 func TestCanReference(t *testing.T) {
+	t.Parallel()
+
 	vRef := testutils.NewTestValidator(V.Options{CheckReferences: true}, "test.network", "test.container")
 	tests := []struct {
 		name      string
@@ -131,9 +141,9 @@ func TestCanReference(t *testing.T) {
 		{"NoErrorsIfFieldAbsent", "[Container]\nOther=5", vRef, nil},
 		{"ReferencesCorrectly", "[Container]\nNetwork=test.network", vRef, nil},
 		{"ReferencesCorrectly2", "[Container]\nNetwork=test.container", vRef, nil},
-		{"BadReference", "[Container]\nNetwork=bad.container", vRef, []V.Location{{"", 2, 8}}},
+		{"BadReference", "[Container]\nNetwork=bad.container", vRef, []V.Location{{Line: 2, Column: 8}}},
 		{"BadReferences", "[Container]\nNetwork=bad.container\nOther=6\nNetwork=otherbad.network", vRef,
-			[]V.Location{{"", 2, 8}, {"", 4, 8}}},
+			[]V.Location{{Line: 2, Column: 8}, {Line: 4, Column: 8}}},
 	}
 
 	rule := CanReference(M.UnitTypeNetwork, M.UnitTypeContainer)
@@ -158,6 +168,8 @@ func TestCanReference(t *testing.T) {
 }
 
 func TestHaveFormat(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -168,9 +180,9 @@ func TestHaveFormat(t *testing.T) {
 		{"FieldWellFormatted2", "[Container]\nNetwork=test:opt1=val1", nil},
 		{"FieldWellFormatted3", "[Container]\nNetwork=test:opt1=val1,opt2=val2", nil},
 		{"FieldWellFormatted4", "[Container]\nNetwork=test:opt1", nil},
-		{"FieldBadFormat", "[Container]\nNetwork=test:", []V.Location{{"", 2, 8}}},
-		{"FieldBadFormat2", "[Container]\nNetwork=test:opt1,", []V.Location{{"", 2, 8}}},
-		{"FieldBadFormat3", "[Container]\nNetwork=test:test2:test3", []V.Location{{"", 2, 8}}},
+		{"FieldBadFormat", "[Container]\nNetwork=test:", []V.Location{{Line: 2, Column: 8}}},
+		{"FieldBadFormat2", "[Container]\nNetwork=test:opt1,", []V.Location{{Line: 2, Column: 8}}},
+		{"FieldBadFormat3", "[Container]\nNetwork=test:test2:test3", []V.Location{{Line: 2, Column: 8}}},
 	}
 
 	format := Format{Name: "TestFormat", ValueSeparator: ":", OptionsSeparator: ","}
@@ -196,6 +208,8 @@ func TestHaveFormat(t *testing.T) {
 }
 
 func TestAllowedValues(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -205,9 +219,9 @@ func TestAllowedValues(t *testing.T) {
 		{"FieldHasSomeAllowedValues", "[Container]\nPublishPort=val1\nPublishPort=val2", nil},
 		{"FieldHasAllAllowedValues", "[Container]\nPublishPort=val1\nPublishPort=val2\nPublishPort=val3", nil},
 		{"FieldHasBadValues", "[Container]\nPublishPort=bad\nPublishPort=bad2",
-			[]V.Location{{"", 2, 12}, {"", 3, 12}}},
+			[]V.Location{{Line: 2, Column: 12}, {Line: 3, Column: 12}}},
 		{"FieldHasSomeBadValues", "[Container]\nPublishPort=bad\nOther=test\nPublishPort=val2\nPublishPort=bad2",
-			[]V.Location{{"", 2, 12}, {"", 5, 12}}},
+			[]V.Location{{Line: 2, Column: 12}, {Line: 5, Column: 12}}},
 	}
 
 	rule := AllowedValues("val1", "val2", "val3")
@@ -232,6 +246,8 @@ func TestAllowedValues(t *testing.T) {
 }
 
 func TestHasSuffix(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -239,7 +255,7 @@ func TestHasSuffix(t *testing.T) {
 	}{
 		{"NoErrorsIfFieldAbsent", "[Container]\nOther=test", nil},
 		{"FieldWithSuffix", "[Container]\nPod=test.pod", nil},
-		{"FieldWithoutSuffix", "[Container]\nPod=bad", []V.Location{{"", 2, 4}}},
+		{"FieldWithoutSuffix", "[Container]\nPod=bad", []V.Location{{Line: 2, Column: 4}}},
 	}
 
 	rule := HasSuffix(".pod")
@@ -264,6 +280,8 @@ func TestHasSuffix(t *testing.T) {
 }
 
 func TestDependsOn(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -271,7 +289,7 @@ func TestDependsOn(t *testing.T) {
 	}{
 		{"NoErrorsIfFieldAbsent", "[Container]\nOther=test", nil},
 		{"FieldWithDependency", "[Container]\nUser=1\nGroup=1", nil},
-		{"FieldWithoutDependency", "[Container]\nGroup=1", []V.Location{{"", 2, 0}}},
+		{"FieldWithoutDependency", "[Container]\nGroup=1", []V.Location{{Line: 2, Column: 0}}},
 	}
 
 	rule := DependsOn(container.User)
@@ -296,6 +314,8 @@ func TestDependsOn(t *testing.T) {
 }
 
 func TestDeprecated(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -303,7 +323,7 @@ func TestDeprecated(t *testing.T) {
 	}{
 		{"NoErrorsIfFieldAbsent", "[Container]\nOther=test", nil},
 		{"DeprecatedFieldPresent", "[Container]\nRemapUid=1\nOther=1\nRemapUid=2",
-			[]V.Location{{"", 2, 0}, {"", 4, 0}}},
+			[]V.Location{{Line: 2, Column: 0}, {Line: 4, Column: 0}}},
 	}
 
 	rule := Deprecated
@@ -328,6 +348,8 @@ func TestDeprecated(t *testing.T) {
 }
 
 func TestMatchRegexp(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -335,7 +357,7 @@ func TestMatchRegexp(t *testing.T) {
 	}{
 		{"NoErrorsIfFieldAbsent", "[Container]\nOther=test", nil},
 		{"FieldMatchesRegexp", "[Container]\nRemapUid=1\nOther=1\nRemapUid=2", nil},
-		{"FieldDoesNotMatchRegexp", "[Container]\nRemapUid=1\nOther=1\nRemapUid=abcd", []V.Location{{"", 4, 9}}},
+		{"FieldDoesNotMatchRegexp", "[Container]\nRemapUid=1\nOther=1\nRemapUid=abcd", []V.Location{{Line: 4, Column: 9}}},
 	}
 
 	rule := MatchRegexp(regexp.MustCompile(`\d+`))
@@ -360,6 +382,8 @@ func TestMatchRegexp(t *testing.T) {
 }
 
 func TestValuesMust(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
@@ -369,7 +393,7 @@ func TestValuesMust(t *testing.T) {
 		{"FieldMatchesCondition", "[Container]\nRemapUid=1\nUser=test", nil},
 		{"FieldMatchesCondition2", "[Container]\nUser=test", nil},
 		{"NoErrorsIfRulePredicateIsFalse", "[Container]\nRemapUid=1\nRemapUid=2\nUser=other", nil},
-		{"ConditionNotRespected", "[Container]\nRemapUid=1\nRemapUid=2\nUser=test", []V.Location{{"", 2, 9}}},
+		{"ConditionNotRespected", "[Container]\nRemapUid=1\nRemapUid=2\nUser=test", []V.Location{{Line: 2, Column: 9}}},
 	}
 
 	rule := ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(container.User, "test"),
@@ -395,6 +419,8 @@ func TestValuesMust(t *testing.T) {
 }
 
 func TestHaveZeroOrOneValues(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		unit  string
@@ -402,7 +428,7 @@ func TestHaveZeroOrOneValues(t *testing.T) {
 	}{
 		{"HasOneValue", "[Container]\nRemapUid=1", nil},
 		{"HasZeroValues", "[Container]\nOther=test", nil},
-		{"HasManyValues", "[Container]\nRemapUid=1\nRemapUid=1", &V.Location{Line: 3, Column: 9}},
+		{"HasManyValues", "[Container]\nRemapUid=1\nRemapUid=5", &V.Location{Line: 3, Column: 9}},
 	}
 
 	for _, test := range tests {
@@ -425,6 +451,8 @@ func TestHaveZeroOrOneValues(t *testing.T) {
 }
 
 func TestWhenFieldEquals(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		unit   string
