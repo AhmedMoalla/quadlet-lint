@@ -9,6 +9,7 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/lookup"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseUnitFileErrors(t *testing.T) {
@@ -17,7 +18,7 @@ func TestParseUnitFileErrors(t *testing.T) {
 	file, errors := ParseUnitFile("not found")
 	assert.Nil(t, file)
 	assert.Len(t, errors, 1)
-	assert.ErrorIs(t, errors[0].inner, os.ErrNotExist)
+	require.ErrorIs(t, errors[0].inner, os.ErrNotExist)
 
 	file, errors = ParseUnitFile("testdata/err.container")
 	assert.Nil(t, file)
@@ -53,7 +54,7 @@ func TestParseUnitFileString(t *testing.T) {
 	t.Parallel()
 
 	bytes, err := os.ReadFile("testdata/httpbin.container")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	file, errors := ParseUnitFileString("httpbin.container", string(bytes))
 	assertUnitFileParsedCorrectly(t, file, errors)
 }
@@ -109,6 +110,8 @@ func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []Parsing
 }
 
 func TestKeyNameIsValid(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		key    string
 		valid  bool
@@ -133,6 +136,8 @@ func TestKeyNameIsValid(t *testing.T) {
 }
 
 func TestGroupNameIsValid(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		key    string
 		valid  bool

@@ -53,11 +53,12 @@ func (f *Format) ParseAndValidate(value string) error {
 	options := make(map[string]string, len(split))
 	for _, pair := range split {
 		kv := strings.Split(pair, "=")
-		if len(kv) == 1 && len(kv[0]) > 0 { // value only option
+		switch {
+		case len(kv) == 1 && len(kv[0]) > 0:
 			options[kv[0]] = kv[0]
-		} else if len(kv) == 2 {
+		case len(kv) == 2: //nolint:mnd
 			options[kv[0]] = kv[1]
-		} else {
+		default:
 			return fmt.Errorf("%w: '%s' does not match the '%s' format because no remaining options were found after "+
 				"the options separator '%s'", ErrNoRemainingOpts, value, f.Name, f.OptionsSeparator)
 		}
