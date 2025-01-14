@@ -124,7 +124,7 @@ func (p *unitFileParser) parseLine(line string) *ParsingError {
 	case lineIsKeyValuePair(line):
 		return p.parseKeyValuePair(line)
 	default:
-		return newParsingErrorAtLine(p.lineNr, p.currentGroup.name, line,
+		return newParsingErrorAtLine(p.lineNr, p.currentGroup.String(), line,
 			fmt.Sprintf("“%s” is not a key-value pair or group", line))
 	}
 }

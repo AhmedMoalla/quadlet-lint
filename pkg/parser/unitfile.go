@@ -29,6 +29,14 @@ type unitGroup struct {
 	lines []unitLine
 }
 
+func (g *unitGroup) String() string {
+	if g == nil {
+		return ""
+	}
+
+	return g.name
+}
+
 func newUnitGroup(name string) *unitGroup {
 	return &unitGroup{
 		name:  name,
@@ -101,7 +109,7 @@ func (f unitFile) UnitType() M.UnitType {
 func (f unitFile) Lookup(field M.Field) (M.LookupResult, bool) {
 	if fn, ok := lookupFuncs[field.LookupFunc]; ok {
 		values := fn(f, field)
-		return lookupResult{values: values}, len(values) > 0
+		return &lookupResult{values: values}, len(values) > 0
 	}
 
 	panic(fmt.Sprintf("lookup mode %s is not supported for field %s", field.LookupFunc.Name, field.Key))

@@ -43,7 +43,7 @@ type lookupResult struct {
 	cachedInterfaceValues []M.UnitValue
 }
 
-func (r lookupResult) BoolValue() bool {
+func (r *lookupResult) BoolValue() bool {
 	if _, ok := r.Value(); ok {
 		return r.values[0].boolValue
 	}
@@ -51,7 +51,7 @@ func (r lookupResult) BoolValue() bool {
 	panic("lookup result does not have a boolean value")
 }
 
-func (r lookupResult) IntValue() int {
+func (r *lookupResult) IntValue() int {
 	if _, ok := r.Value(); ok {
 		return r.values[0].intValue
 	}
@@ -59,7 +59,7 @@ func (r lookupResult) IntValue() int {
 	panic("lookup result does not have an int value")
 }
 
-func (r lookupResult) Value() (M.UnitValue, bool) {
+func (r *lookupResult) Value() (M.UnitValue, bool) {
 	if len(r.Values()) == 0 {
 		return M.UnitValue{}, false
 	}
@@ -71,7 +71,7 @@ func (r lookupResult) Value() (M.UnitValue, bool) {
 	return r.Values()[0], true
 }
 
-func (r lookupResult) Values() []M.UnitValue {
+func (r *lookupResult) Values() []M.UnitValue {
 	if r.cachedInterfaceValues == nil {
 		r.cachedInterfaceValues = utils.MapSlice(r.values, unitValue.toModel)
 	}
