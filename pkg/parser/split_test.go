@@ -95,6 +95,8 @@ func TestCUnescapeOne(t *testing.T) {
 }
 
 func TestExtractFirstWordUnescapes(t *testing.T) {
+	t.Parallel()
+
 	input := `\a \b \f \n \r \t \v \\ \" \' \s \x50odman is \U0001F51F/\u0031\u0030 \110ello \127orld`
 	expected := []string{"\a", "\b", "\f", "\n", "\r", "\t", "\v", "\\", "\"", "'", " ",
 		"Podman", "is", "🔟/10", "Hello", "World"}
