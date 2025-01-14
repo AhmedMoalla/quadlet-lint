@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSplitValueAppend(t *testing.T) {
@@ -72,6 +73,7 @@ func TestCUnescapeOne(t *testing.T) {
 		{name: `\U0001F51F`, in: "U0001F51F", ret: '🔟', count: 9},
 		{name: `\U00000000 acceptNul=false`, in: "U00000000", ret: 0, count: -1, acceptNul: false},
 		{name: `\U00000000 acceptNul=true`, in: "U00000000", ret: 0, count: 9, acceptNul: true},
+		{name: "376", in: "376", ret: 'þ', count: 3, eightBit: true},
 		{name: `too short 77`, in: "77", ret: 0, count: -1},
 		{name: `invalid octal 792`, in: "792", ret: 0, count: -1},
 		{name: `invalid octal 758`, in: "758", ret: 0, count: -1},
@@ -89,5 +91,26 @@ func TestCUnescapeOne(t *testing.T) {
 			assert.Equal(t, test.ret, out)
 			assert.Equal(t, test.eightBit, eightBit)
 		})
+	}
+}
+
+func TestExtractFirstWordUnescapes(t *testing.T) {
+	input := `\a \b \f \n \r \t \v \\ \" \' \s \x50odman is \U0001F51F/\u0031\u0030 \110ello \127orld`
+	expected := []string{"\a", "\b", "\f", "\n", "\r", "\t", "\v", "\\", "\"", "'", " ",
+		"Podman", "is", "🔟/10", "Hello", "World"}
+
+	i := 0
+	next := input
+	for {
+		word, remaining, moreWords, err := extractFirstWord(next, " ", SplitCUnescape)
+		require.NoError(t, err)
+
+		if !moreWords {
+			break
+		}
+
+		next = remaining
+		assert.Equal(t, expected[i], word)
+		i++
 	}
 }
