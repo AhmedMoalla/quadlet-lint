@@ -1,0 +1,21 @@
+[Container]
+ContainerName=speedtest
+Image=lscr.io/linuxserver/speedtest-tracker:0.24.3
+PublishPort=8085:80/tcp
+Network=my-network
+Environment=TZ=Europe/Paris 'SPEEDTEST_SCHEDULE=0 * * * *' APP_URL=https://speedtest.com APP_KEY=KEY
+
+Volume=/data/speedtest:/config:Z
+
+HealthCmd=curl -fSs localhost/api/healthcheck | jq -r .message || exit 1
+HealthInterval=10s
+HealthRetries=3
+HealthStartPeriod=30s
+HealthTimeout=10s
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target default.target

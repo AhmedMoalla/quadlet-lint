@@ -2,24 +2,24 @@ package quadlet
 
 import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/validator"
+	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
 const ValidatorName = "quadlet"
 
 var (
-	AmbiguousImageName = validator.NewErrorType("ambiguous-image-name", validator.LevelWarning)
+	AmbiguousImageName = V.NewErrorType("ambiguous-image-name", V.LevelWarning)
 )
 
-func Validator(units []model.UnitFile, options validator.Options) validator.Validator {
-	context := validator.Context{
+func Validator(units []model.UnitFile, options V.Options) V.Validator {
+	context := V.Context{
 		AllUnitFiles: units,
 		Options:      options,
 	}
 	return quadletValidator{
 		name:    ValidatorName,
 		context: context,
-		validators: map[model.UnitType]validator.Validator{
+		validators: map[model.UnitType]V.Validator{
 			model.UnitTypeContainer: containerValidator{name: "container", context: context},
 			model.UnitTypeVolume:    noOpValidator{},
 			model.UnitTypeKube:      noOpValidator{},
@@ -33,19 +33,19 @@ func Validator(units []model.UnitFile, options validator.Options) validator.Vali
 
 type quadletValidator struct {
 	name       string
-	context    validator.Context
-	validators map[model.UnitType]validator.Validator
+	context    V.Context
+	validators map[model.UnitType]V.Validator
 }
 
 func (v quadletValidator) Name() string {
 	return v.name
 }
 
-func (v quadletValidator) Context() validator.Context {
+func (v quadletValidator) Context() V.Context {
 	return v.context
 }
 
-func (v quadletValidator) Validate(unit model.UnitFile) []validator.ValidationError {
+func (v quadletValidator) Validate(unit model.UnitFile) []V.ValidationError {
 	return v.validators[unit.UnitType()].Validate(unit)
 }
 
@@ -55,10 +55,10 @@ func (v noOpValidator) Name() string {
 	return "noop"
 }
 
-func (v noOpValidator) Context() validator.Context {
-	return validator.Context{}
+func (v noOpValidator) Context() V.Context {
+	return V.Context{}
 }
 
-func (v noOpValidator) Validate(model.UnitFile) []validator.ValidationError {
-	return []validator.ValidationError{}
+func (v noOpValidator) Validate(model.UnitFile) []V.ValidationError {
+	return []V.ValidationError{}
 }
