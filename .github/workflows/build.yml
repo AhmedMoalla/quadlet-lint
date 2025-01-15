@@ -29,6 +29,13 @@ jobs:
       - name: Run tests
         run: make test
 
+      - name: Check test coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.testcoverage.yml
+          git-token: ${{ github.ref_name == 'main' && secrets.GITHUB_TOKEN || '' }}
+          git-branch: badges
+
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:

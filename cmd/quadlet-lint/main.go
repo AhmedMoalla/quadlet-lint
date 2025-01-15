@@ -52,8 +52,6 @@ func logSummary(unitFiles []string, errors validator.ValidationErrors) {
 }
 
 func readInputPath() string {
-	flag.Parse()
-
 	var inputDirOrFile string
 	if flag.NArg() == 0 {
 		inputDirOrFile = getWorkingDirectory()
@@ -119,8 +117,12 @@ func reportErrors(errors validator.ValidationErrors) {
 
 			fmt.Printf("%s:\n", path)
 			for _, err := range errs {
-				fmt.Printf("\t-> [%s][%s.%s][%d:%d] %s\n",
-					err.Level, err.ValidatorName, err.ErrorCategory.Name, err.Line, err.Column, err.Error)
+				validatorName := err.ValidatorName
+				if validatorName != "" {
+					validatorName += "."
+				}
+				fmt.Printf("\t-> [%s][%s%s][%d:%d] %s\n",
+					err.Level, validatorName, err.ErrorCategory.Name, err.Line, err.Column, err.Error)
 			}
 		}
 	}
