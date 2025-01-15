@@ -1,0 +1,19 @@
+[Container]
+# ConflictsWith
+Rootfs=test
+# ImageNotAmbiguous
+Image=test
+# Deprecated, ValuesMust(HaveZeroOrOneValues, WhenFieldEquals(RemapUsers, "keep-id", "auto")
+RemapUid=123
+RemapUid=345
+RemapUsers=keep-id
+
+## assert-error key-conflict Container Rootfs 3 0
+## assert-error key-conflict Container Image 5 0
+
+## assert-error ambiguous-image-name Container Image 5 6
+
+## assert-error deprecated-key Container RemapUid 7 0
+## assert-error deprecated-key Container RemapUid 8 0
+## assert-error deprecated-key Container RemapUsers 9 0
+## assert-error invalid-value condition-not-matched Container RemapUid 7 9

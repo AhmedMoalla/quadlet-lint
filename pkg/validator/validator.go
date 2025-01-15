@@ -24,48 +24,73 @@ type Options struct {
 }
 
 var (
-	UnknownKey            = NewErrorType("unknown-key", LevelError)
-	RequiredKey           = NewErrorType("required-key", LevelError)
-	KeyConflict           = NewErrorType("key-conflict", LevelError)
-	InvalidValue          = NewErrorType("invalid-value", LevelError)
-	DeprecatedKey         = NewErrorType("deprecated-key", LevelWarning)
-	UnsatisfiedDependency = NewErrorType("unsatisfied-dependency", LevelError)
-	InvalidReference      = NewErrorType("invalid-reference", LevelError)
-	EmptyValue            = NewErrorType("empty-value", LevelError)
+	UnknownKey            = NewErrorCategory("unknown-key", LevelError)
+	RequiredKey           = NewErrorCategory("required-key", LevelError)
+	KeyConflict           = NewErrorCategory("key-conflict", LevelError)
+	InvalidValue          = NewErrorCategory("invalid-value", LevelError)
+	DeprecatedKey         = NewErrorCategory("deprecated-key", LevelWarning)
+	UnsatisfiedDependency = NewErrorCategory("unsatisfied-dependency", LevelError)
+	InvalidReference      = NewErrorCategory("invalid-reference", LevelError)
 )
 
 type ValidationError struct {
-	ErrorType
+	ErrorCategory
 	Location
-	Message       string
+	Error         error
 	ValidatorName string
-}
-
-func Err(validatorName string, errType ErrorType, line, column int, message string) *ValidationError {
-	return &ValidationError{
-		ErrorType:     errType,
-		Location:      Location{Line: line, Column: column},
-		Message:       message,
-		ValidatorName: validatorName,
-	}
-}
-
-func (err ValidationError) Error() string {
-	return err.Message
+	Group         string
+	Key           string
+	ErrorName     string
 }
 
 func (err ValidationError) String() string {
-	return fmt.Sprintf("%s.%s", err.ValidatorName, err.ErrorType.Name)
+	if err.ErrorName != "" {
+		return fmt.Sprintf("%s.%s.%s", err.ValidatorName, err.ErrorCategory.Name, err.ErrorName)
+	}
+	return fmt.Sprintf("%s.%s", err.ValidatorName, err.ErrorCategory.Name)
 }
 
-type ErrorType struct {
-	Name          string
-	Level         Level
-	ValidatorName string
+type ErrorCategory struct {
+	Name  string
+	Level Level
 }
 
-func NewErrorType(name string, level Level) ErrorType {
-	return ErrorType{
+func (c ErrorCategory) ErrForField(validatorName, errName string, field model.Field,
+	line, column int, message string) *ValidationError {
+	return c.ErrWithName(validatorName, errName, field.Group, field.Key, line, column, message)
+}
+
+func (c ErrorCategory) Err(validatorName string, group, key string, line, column int, message string) *ValidationError {
+	return c.ErrWithName(validatorName, "", group, key, line, column, message)
+}
+
+func (c ErrorCategory) ErrWithName(validatorName, errName, group, key string,
+	line, column int, message string) *ValidationError {
+	var err error
+	if errName == "" {
+		err = fmt.Errorf("%s: %s", c.Name, message)
+	} else {
+		err = fmt.Errorf("%s.%s: %s", c.Name, errName, message)
+	}
+
+	return &ValidationError{
+		ErrorCategory: c,
+		Location:      Location{Line: line, Column: column},
+		Error:         err,
+		ValidatorName: validatorName,
+		Group:         group,
+		Key:           key,
+		ErrorName:     errName,
+	}
+}
+
+func (c ErrorCategory) ErrSlice(validatorName, errName string,
+	field model.Field, line, column int, message string) []ValidationError {
+	return []ValidationError{*c.ErrForField(validatorName, errName, field, line, column, message)}
+}
+
+func NewErrorCategory(name string, level Level) ErrorCategory {
+	return ErrorCategory{
 		Name:  name,
 		Level: level,
 	}

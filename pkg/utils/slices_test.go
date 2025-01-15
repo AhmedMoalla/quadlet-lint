@@ -8,6 +8,8 @@ import (
 )
 
 func TestMapSlice(t *testing.T) {
+	t.Parallel()
+
 	type test struct {
 		prop1 string
 	}

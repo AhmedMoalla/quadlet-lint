@@ -1,26 +1,39 @@
 package quadlet
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
-	"github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils/assertions"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+const testsDir = "testdata/tests"
+
 func TestContainerValidator_Validate(t *testing.T) {
-	errors := validate(t, "testdata/unit.container")
-	assert.Empty(t, errors)
+	t.Parallel()
 
-	errors = validate(t, "testdata/err.container")
-	assert.NotEmpty(t, errors)
-	// TODO: implement ## assert-error RequiredKey Container Image 0 0
-}
+	entries, err := os.ReadDir(testsDir)
+	require.NoError(t, err)
 
-func validate(t *testing.T, filename string) []V.ValidationError {
-	unit, err := parser.ParseUnitFile(filename)
-	require.Empty(t, err)
-	return Validator([]model.UnitFile{unit}, V.Options{CheckReferences: true}).Validate(unit)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		path := filepath.Join(testsDir, entry.Name())
+		t.Run(entry.Name(), func(t *testing.T) {
+			t.Parallel()
+
+			unit, asserts, err := assertions.ParseAndReadAssertions(path)
+			if err != nil {
+				require.NoError(t, err)
+			}
+			errs := Validator(append(testutils.IncludedTestUnits, unit), V.Options{CheckReferences: true}).Validate(unit)
+			asserts.RunAssertions(t, errs)
+		})
+	}
 }

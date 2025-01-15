@@ -5,6 +5,7 @@ import (
 
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
+	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
@@ -46,6 +47,14 @@ func NewTestValidator(options V.Options, files ...string) V.Validator {
 		Options:      options,
 		AllUnitFiles: units,
 	}}
+}
+
+var IncludedTestUnits = generateFilePerExtension()
+
+func generateFilePerExtension() []M.UnitFile {
+	return utils.MapSlice(M.AllUnitFileExtensions, func(ext string) M.UnitFile {
+		return testUnitFile{filename: "test" + ext}
+	})
 }
 
 type testUnitFile struct {

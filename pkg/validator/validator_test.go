@@ -1,20 +1,23 @@
 package validator
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 var (
+	errOther = errors.New("other")
+
 	errLevel = []ValidationError{
-		{Message: "Error1", ErrorType: ErrorType{Level: LevelError}},
-		{Message: "Error2", ErrorType: ErrorType{Level: LevelError}},
-		{Message: "Error3", ErrorType: ErrorType{Level: LevelError}},
+		{Error: errors.New("error1"), ErrorCategory: ErrorCategory{Level: LevelError}},
+		{Error: errors.New("error2"), ErrorCategory: ErrorCategory{Level: LevelError}},
+		{Error: errors.New("error3"), ErrorCategory: ErrorCategory{Level: LevelError}},
 	}
 	warnLevel = []ValidationError{
-		{Message: "Warn1", ErrorType: ErrorType{Level: LevelWarning}},
-		{Message: "Warn2", ErrorType: ErrorType{Level: LevelWarning}},
+		{Error: errors.New("warn1"), ErrorCategory: ErrorCategory{Level: LevelWarning}},
+		{Error: errors.New("warn2"), ErrorCategory: ErrorCategory{Level: LevelWarning}},
 	}
 )
 
@@ -40,7 +43,10 @@ func TestValidationErrors_HasErrors(t *testing.T) {
 	assert.False(t, errs.HasErrors())
 
 	errs = make(ValidationErrors)
-	errs["test.go"] = append(errs["test.go"], ValidationError{Message: "Other", ErrorType: ErrorType{Level: "Other"}})
+	errs["test.go"] = append(errs["test.go"], ValidationError{
+		Error:         errOther,
+		ErrorCategory: ErrorCategory{Level: "Other"},
+	})
 	assert.False(t, errs.HasErrors())
 }
 
@@ -52,7 +58,7 @@ func TestValidationErrors_AddError(t *testing.T) {
 
 	assert.Len(t, errs["test.go"], len(errLevel))
 
-	errs.AddError("test.go", ValidationError{Message: "Other", ErrorType: ErrorType{Level: "Other"}})
+	errs.AddError("test.go", ValidationError{Error: errOther, ErrorCategory: ErrorCategory{Level: "Other"}})
 	assert.Len(t, errs["test.go"], len(errLevel)+1)
 }
 

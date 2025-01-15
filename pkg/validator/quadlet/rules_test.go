@@ -15,6 +15,8 @@ import (
 var validator = testutils.NewTestValidator(V.Options{})
 
 func TestNetworkFormat(t *testing.T) {
+	t.Parallel()
+
 	err := NetworkFormat.ParseAndValidate("value.container:opt1=val1")
 	require.ErrorIs(t, err, rules.ErrInvalidOptions)
 }
@@ -54,14 +56,14 @@ func TestImageNotAmbiguous(t *testing.T) {
 		t.Run(test.image, func(t *testing.T) {
 			t.Parallel()
 
-			unit := testutils.ParseString(t, fmt.Sprintf("[Container]\nImage=%s", test.image))
+			unit := testutils.ParseString(t, "[Container]\nImage=%s"+test.image)
 			errors := ImageNotAmbiguous(validator, unit, container.Image)
 			assert.Equal(t, len(errors) == 0, test.res)
 
 			if len(errors) == 1 {
 				err := errors[0]
 				assert.Equal(t, validator.Name(), err.ValidatorName)
-				assert.Equal(t, AmbiguousImageName, err.ErrorType)
+				assert.Equal(t, AmbiguousImageName, err.ErrorCategory)
 				assert.Equal(t, 2, err.Line)
 				assert.Equal(t, 6, err.Column)
 			} else if len(errors) > 1 {

@@ -40,7 +40,8 @@ func ImageNotAmbiguous(validator V.Validator, unit M.UnitFile, field M.Field) []
 
 	value, ok := res.Value()
 	if !ok {
-		return R.ErrSlice(validator.Name(), V.InvalidValue, value.Line, value.Column, "value not found")
+		return AmbiguousImageName.ErrSlice(validator.Name(), "empty-value", field, value.Line, value.Column,
+			"value not found")
 	}
 
 	imageName := value.Value
@@ -53,7 +54,7 @@ func ImageNotAmbiguous(validator V.Validator, unit M.UnitFile, field M.Field) []
 		message := fmt.Sprintf("%s specifies the image \"%s\" which not a fully qualified image name. "+
 			"This is not ideal for performance and security reasons. "+
 			"See the podman-pull manpage discussion of short-name-aliases.conf for details.", unit.FileName(), imageName)
-		return R.ErrSlice(validator.Name(), AmbiguousImageName, value.Line, value.Column, message)
+		return AmbiguousImageName.ErrSlice(validator.Name(), "", field, value.Line, value.Column, message)
 	}
 
 	return nil
