@@ -10,8 +10,7 @@ on:
 
 jobs:
   build:
-    permissions:
-      contents: read
+    permissions: write-all
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
