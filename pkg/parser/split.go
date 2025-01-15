@@ -224,7 +224,7 @@ func cUnescapeOne(p string, acceptNul bool) (int, rune, bool) {
 	return count, ret, eightBit
 }
 
-// This is based on code from systemd (src/basic/extract-workd.c), marked LGPL-2.1-or-later
+// This is based on code from systemd (src/basic/extract-word.c), marked LGPL-2.1-or-later
 // and is copyrighted by the systemd developers
 
 var (
