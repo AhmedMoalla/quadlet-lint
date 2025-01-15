@@ -42,7 +42,7 @@ func assertUnknownKeyError(t *testing.T, err V.ValidationError, line int) {
 	t.Helper()
 
 	assert.Equal(t, validator.Name(), err.ValidatorName)
-	assert.Equal(t, V.UnknownKey, err.ErrorType)
+	assert.Equal(t, V.UnknownKey, err.ErrorCategory)
 	assert.Equal(t, 0, err.Column)
-	assert.Equal(t, line, err.Line, err.Message)
+	assert.Equal(t, line, err.Line, err.Error)
 }

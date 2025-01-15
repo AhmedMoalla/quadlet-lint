@@ -2,7 +2,7 @@
 ContainerName=speedtest
 Image=lscr.io/linuxserver/speedtest-tracker:0.24.3
 PublishPort=8085:80/tcp
-Network=my-network
+Network=my-network,opt1=val1:opt2=val2
 Environment=TZ=Europe/Paris 'SPEEDTEST_SCHEDULE=0 * * * *' APP_URL=https://speedtest.com APP_KEY=KEY
 
 Volume=/data/speedtest:/config:Z
@@ -12,6 +12,11 @@ HealthInterval=10s
 HealthRetries=3
 HealthStartPeriod=30s
 HealthTimeout=10s
+
+Group=123
+User=456
+
+Pod=test.pod
 
 [Service]
 Restart=always

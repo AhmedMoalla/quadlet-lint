@@ -34,13 +34,13 @@ func TestCheckRules(t *testing.T) {
 
 	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
 		return err.ValidatorName == v.Name() &&
-			err.ErrorType == V.RequiredKey &&
+			err.ErrorCategory == V.RequiredKey &&
 			err.Line == 0 && err.Column == 0
 	}))
 
 	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
 		return err.ValidatorName == v.Name() &&
-			err.ErrorType == V.InvalidValue &&
+			err.ErrorCategory == V.InvalidValue &&
 			err.Line == 4 && err.Column == 9
 	}))
 }
@@ -82,7 +82,7 @@ func TestRequiredIfNotPresent(t *testing.T) {
 			if len(errs) > 0 {
 				for _, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.RequiredKey, err.ErrorType)
+					assert.Equal(t, V.RequiredKey, err.ErrorCategory)
 					assert.Equal(t, 0, err.Line)
 					assert.Equal(t, 0, err.Column)
 				}
@@ -118,7 +118,7 @@ func TestConflictsWith(t *testing.T) {
 			if len(errs) > 0 {
 				for _, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.KeyConflict, err.ErrorType)
+					assert.Equal(t, V.KeyConflict, err.ErrorCategory)
 					assert.Equal(t, test.errorLine, err.Line)
 					assert.Equal(t, 0, err.Column)
 				}
@@ -158,7 +158,7 @@ func TestCanReference(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, test.validator.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidReference, err.ErrorType)
+					assert.Equal(t, V.InvalidReference, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -198,7 +198,7 @@ func TestHaveFormat(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidValue, err.ErrorType)
+					assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -236,7 +236,7 @@ func TestAllowedValues(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidValue, err.ErrorType)
+					assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -270,7 +270,7 @@ func TestHasSuffix(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidValue, err.ErrorType)
+					assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -304,7 +304,7 @@ func TestDependsOn(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.UnsatisfiedDependency, err.ErrorType)
+					assert.Equal(t, V.UnsatisfiedDependency, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -338,7 +338,7 @@ func TestDeprecated(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.DeprecatedKey, err.ErrorType)
+					assert.Equal(t, V.DeprecatedKey, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -372,7 +372,7 @@ func TestMatchRegexp(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidValue, err.ErrorType)
+					assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -409,7 +409,7 @@ func TestValuesMust(t *testing.T) {
 			if len(errs) > 0 {
 				for i, err := range errs {
 					assert.Equal(t, v.Name(), err.ValidatorName)
-					assert.Equal(t, V.InvalidValue, err.ErrorType)
+					assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 					assert.Equal(t, test.errors[i].Line, err.Line)
 					assert.Equal(t, test.errors[i].Column, err.Column)
 				}
@@ -440,7 +440,7 @@ func TestHaveZeroOrOneValues(t *testing.T) {
 
 			if err := HaveZeroOrOneValues(v, container.RemapUid, res.Values()); err != nil {
 				assert.Equal(t, v.Name(), err.ValidatorName)
-				assert.Equal(t, V.InvalidValue, err.ErrorType)
+				assert.Equal(t, V.InvalidValue, err.ErrorCategory)
 				if test.error != nil {
 					assert.Equal(t, test.error.Line, err.Line)
 					assert.Equal(t, test.error.Column, err.Column)

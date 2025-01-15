@@ -1,0 +1,38 @@
+# RequiredIfNotPresent(Image), RequiredIfNotPresent(Rootfs)
+[Container]
+# HaveFormat(NetworkFormat), MatchRegexp(`\d+(-\d+)?(/udp|/tcp)?$`)
+Network=:net::,
+# HasSuffix(M.UnitTypePod.Ext)
+Pod=test
+# DependsOn(User)
+Group=group
+# Deprecated
+RemapUid=123
+# Deprecated, AllowedValues("manual", "auto", "keep-id")
+RemapUsers=map
+
+[Service]
+# AllowedValues("mixed", "control-group")
+KillMode=test
+# AllowedValues("notify", "oneshot")
+Type=test
+
+
+## assert-error required-key Container Image 0 0
+## assert-error required-key Container Rootfs 0 0
+
+## assert-error invalid-value not-match-regex Container Network 4 8
+## assert-error invalid-value bad-format Container Network 4 8
+
+## assert-error invalid-value required-suffix Container Pod 6 4
+
+## assert-error unsatisfied-dependency Container Group 8 0
+
+## assert-error deprecated-key Container RemapUid 10 0
+
+## assert-error deprecated-key Container RemapUsers 12 0
+## assert-error invalid-value value-not-allowed Container RemapUsers 12 11
+
+## assert-error invalid-value value-not-allowed Service KillMode 16 9
+
+## assert-error invalid-value value-not-allowed Service Type 18 5

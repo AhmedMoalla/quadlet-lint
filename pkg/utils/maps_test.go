@@ -7,6 +7,8 @@ import (
 )
 
 func TestMergeMaps(t *testing.T) {
+	t.Parallel()
+
 	map1 := map[string]string{
 		"a": "b",
 		"c": "d",
@@ -25,6 +27,8 @@ func TestMergeMaps(t *testing.T) {
 }
 
 func TestReverseMap(t *testing.T) {
+	t.Parallel()
+
 	src := map[string]string{
 		"a": "b",
 		"c": "d",

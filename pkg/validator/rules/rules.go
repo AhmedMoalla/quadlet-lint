@@ -12,14 +12,21 @@ import (
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
+const (
+	ErrValueNotAllowed     = "value-not-allowed"
+	ErrRequiredSuffix      = "required-suffix"
+	ErrKeyConflict         = "key-conflict"
+	ErrBadFormat           = "bad-format"
+	ErrNoMatchRegex        = "not-match-regex"
+	ErrZeroOrOneValue      = "zero-or-one-value"
+	ErrOneRequired         = "one-required"
+	ErrConditionNotMatched = "condition-not-matched"
+)
+
 // ================== Utilities ==================
 
 func Rules(rules ...V.Rule) []V.Rule {
 	return rules
-}
-
-func ErrSlice(validatorName string, errType V.ErrorType, line, column int, message string) []V.ValidationError {
-	return []V.ValidationError{*V.Err(validatorName, errType, line, column, message)}
 }
 
 func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.ValidationError {
@@ -59,7 +66,7 @@ func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.Va
 func RequiredIfNotPresent(other Field) V.Rule {
 	return func(validator V.Validator, unit UnitFile, field Field) []V.ValidationError {
 		if !unit.HasValue(other) && !unit.HasValue(field) {
-			return ErrSlice(validator.Name(), V.RequiredKey, 0, 0,
+			return V.RequiredKey.ErrSlice(validator.Name(), ErrOneRequired, field, 0, 0,
 				fmt.Sprintf("at least one of these keys is required: %s, %s", field, other))
 		}
 
@@ -74,8 +81,8 @@ func ConflictsWith(others ...Field) V.Rule {
 			if unit.HasValue(other) && unit.HasValue(field) {
 				res, _ := unit.Lookup(field)
 				for _, value := range res.Values() {
-					validationErrors = append(validationErrors, *V.Err(validator.Name(), V.KeyConflict, value.Line, 0,
-						fmt.Sprintf("the keys %s, %s cannot be specified together", field, other)))
+					validationErrors = append(validationErrors, *V.KeyConflict.ErrForField(validator.Name(), "", field,
+						value.Line, 0, fmt.Sprintf("the keys %s, %s cannot be specified together", field, other)))
 				}
 			}
 		}
@@ -106,8 +113,9 @@ func CanReference(unitTypes ...UnitType) V.Rule {
 					})
 
 					if !foundUnit {
-						validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidReference, value.Line, value.Column,
-							fmt.Sprintf("requested Quadlet %s '%s' was not found", unitType.Name, value.Value)))
+						validationErrors = append(validationErrors, *V.InvalidReference.ErrForField(validator.Name(), "",
+							field, value.Line, value.Column, fmt.Sprintf("requested Quadlet %s '%s' was not found",
+								unitType.Name, value.Value)))
 					}
 					break
 				}
@@ -129,8 +137,8 @@ func HaveFormat(format Format) V.Rule {
 		for _, value := range res.Values() {
 			err := format.ParseAndValidate(value.Value)
 			if err != nil {
-				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line,
-					value.Column, err.Error()))
+				validationErrors = append(validationErrors, *V.InvalidValue.ErrForField(validator.Name(), ErrBadFormat, field,
+					value.Line, value.Column, err.Error()))
 			}
 		}
 
@@ -148,8 +156,8 @@ func AllowedValues(allowedValues ...string) V.Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range res.Values() {
 			if !slices.Contains(allowedValues, value.Value) {
-				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
-					fmt.Sprintf("invalid value '%s' for key '%s'. Allowed values: %s",
+				validationErrors = append(validationErrors, *V.InvalidValue.ErrForField(validator.Name(), ErrValueNotAllowed, field,
+					value.Line, value.Column, fmt.Sprintf("invalid value '%s' for key '%s'. Allowed values: %s",
 						value.Value, field, allowedValues)))
 			}
 		}
@@ -167,8 +175,8 @@ func HasSuffix(suffix string) V.Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range res.Values() {
 			if !strings.HasSuffix(value.Value, suffix) {
-				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
-					fmt.Sprintf("value '%s' must have suffix '%s'", value.Value, suffix)))
+				validationErrors = append(validationErrors, *V.InvalidValue.ErrForField(validator.Name(), ErrRequiredSuffix, field,
+					value.Line, value.Column, fmt.Sprintf("value '%s' must have suffix '%s'", value.Value, suffix)))
 			}
 		}
 
@@ -187,7 +195,8 @@ func DependsOn(dependency Field) V.Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		if !dependencyOk && fieldOk {
 			for _, value := range res.Values() {
-				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.UnsatisfiedDependency, value.Line, 0,
+				validationErrors = append(validationErrors, *V.UnsatisfiedDependency.ErrForField(validator.Name(), "",
+					field, value.Line, 0,
 					fmt.Sprintf("value for '%s' was set but it depends on key '%s' which was not found",
 						field, dependency.Key)))
 			}
@@ -205,8 +214,8 @@ func Deprecated(validator V.Validator, unit UnitFile, field Field) []V.Validatio
 
 	validationErrors := make([]V.ValidationError, 0)
 	for _, value := range res.Values() {
-		validationErrors = append(validationErrors, *V.Err(validator.Name(), V.DeprecatedKey, value.Line, 0,
-			fmt.Sprintf("key '%s' is deprecated and should not be used", field)))
+		validationErrors = append(validationErrors, *V.DeprecatedKey.ErrForField(validator.Name(), "", field,
+			value.Line, 0, fmt.Sprintf("key '%s' is deprecated and should not be used", field)))
 	}
 	return validationErrors
 }
@@ -221,8 +230,8 @@ func MatchRegexp(regex *regexp.Regexp) V.Rule {
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range res.Values() {
 			if !regex.MatchString(value.Value) {
-				validationErrors = append(validationErrors, *V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column,
-					fmt.Sprintf("Must match regexp '%s'", regex.String())))
+				validationErrors = append(validationErrors, *V.InvalidValue.ErrForField(validator.Name(), ErrNoMatchRegex, field,
+					value.Line, value.Column, fmt.Sprintf("Must match regexp '%s'", regex.String())))
 			}
 		}
 		return validationErrors
@@ -244,7 +253,7 @@ func ValuesMust(valuesPredicate ValuesValidator, rulePredicate RulePredicate, me
 					line = firstValue.Line
 					column = firstValue.Column
 				}
-				return ErrSlice(validator.Name(), V.InvalidValue, line, column, errorMsg)
+				return V.InvalidValue.ErrSlice(validator.Name(), ErrConditionNotMatched, field, line, column, errorMsg)
 			}
 		}
 
@@ -266,7 +275,7 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 	if len(errorMsg) > 0 {
 		errorMsg = fmt.Sprintf("%s. %s", errorMsg, err)
 	} else if len(errorMsg) == 0 {
-		errorMsg = err.Error()
+		errorMsg = err.Error.Error()
 	}
 
 	return errorMsg
@@ -277,10 +286,11 @@ func buildErrorMessage(messageAndArgs []any, err *V.ValidationError) string {
 type ValuesValidator func(validator V.Validator, field Field, values []UnitValue) *V.ValidationError
 type RulePredicate func(validator V.Validator, unit UnitFile, field Field) bool
 
-func HaveZeroOrOneValues(validator V.Validator, _ Field, values []UnitValue) *V.ValidationError {
+func HaveZeroOrOneValues(validator V.Validator, field Field, values []UnitValue) *V.ValidationError {
 	if len(values) > 1 {
 		value := values[1]
-		return V.Err(validator.Name(), V.InvalidValue, value.Line, value.Column, "should have exactly zero or one value")
+		return V.InvalidValue.ErrForField(validator.Name(), ErrZeroOrOneValue, field, value.Line, value.Column,
+			"should have exactly zero or one value")
 	}
 
 	return nil

@@ -10,6 +10,16 @@ var (
 	UnitTypePod       = UnitType{Name: "pod", Ext: ".pod"}
 )
 
+var AllUnitFileExtensions = []string{
+	UnitTypeContainer.Ext,
+	UnitTypeVolume.Ext,
+	UnitTypeKube.Ext,
+	UnitTypeNetwork.Ext,
+	UnitTypeImage.Ext,
+	UnitTypeBuild.Ext,
+	UnitTypePod.Ext,
+}
+
 type UnitFile interface {
 	FileName() string
 	UnitType() UnitType

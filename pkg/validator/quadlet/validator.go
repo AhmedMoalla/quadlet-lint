@@ -8,7 +8,7 @@ import (
 const ValidatorName = "quadlet"
 
 var (
-	AmbiguousImageName = V.NewErrorType("ambiguous-image-name", V.LevelWarning)
+	AmbiguousImageName = V.NewErrorCategory("ambiguous-image-name", V.LevelWarning)
 )
 
 func Validator(units []model.UnitFile, options V.Options) V.Validator {

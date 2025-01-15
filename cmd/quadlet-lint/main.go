@@ -73,10 +73,9 @@ func findUnitFiles(inputDirOrFile string) []string {
 	return unitFilesPaths
 }
 
-var ParsingError = validator.ErrorType{
-	Name:          "parsing-error",
-	Level:         validator.LevelError,
-	ValidatorName: "parser",
+var ParsingError = validator.ErrorCategory{
+	Name:  "parsing-error",
+	Level: validator.LevelError,
 }
 
 func parseUnitFiles(unitFilesPaths []string) ([]model.UnitFile, validator.ValidationErrors) {
@@ -89,7 +88,7 @@ func parseUnitFiles(unitFilesPaths []string) ([]model.UnitFile, validator.Valida
 		}
 
 		for _, err := range errs {
-			errors.AddError(path, *validator.Err("", ParsingError, err.Line, err.Column, err.Error()))
+			errors.AddError(path, *ParsingError.Err("", err.Group, err.Key, err.Line, err.Column, err.Error()))
 		}
 	}
 	return unitFiles, errors
@@ -120,8 +119,8 @@ func reportErrors(errors validator.ValidationErrors) {
 
 			fmt.Printf("%s:\n", path)
 			for _, err := range errs {
-				fmt.Printf("\t-> [%s][%s.%s][%d:%d] %s\n", err.Level, err.ValidatorName, err.ErrorType.Name, err.Line, err.Column,
-					err.Message)
+				fmt.Printf("\t-> [%s][%s.%s][%d:%d] %s\n",
+					err.Level, err.ValidatorName, err.ErrorCategory.Name, err.Line, err.Column, err.Error)
 			}
 		}
 	}
@@ -145,16 +144,6 @@ func isDir(path string) bool {
 	return fileInfo.IsDir()
 }
 
-var supportedExtensions = []string{
-	model.UnitTypeContainer.Ext,
-	model.UnitTypeVolume.Ext,
-	model.UnitTypeKube.Ext,
-	model.UnitTypeNetwork.Ext,
-	model.UnitTypeImage.Ext,
-	model.UnitTypeBuild.Ext,
-	model.UnitTypePod.Ext,
-}
-
 func getAllUnitFiles(rootDirectory string) []string {
 	unitFilesPaths := make([]string, 0)
 	err := filepath.WalkDir(rootDirectory, func(path string, entry fs.DirEntry, err error) error {
@@ -162,7 +151,7 @@ func getAllUnitFiles(rootDirectory string) []string {
 			return filepath.SkipDir
 		}
 
-		if slices.Contains(supportedExtensions, filepath.Ext(path)) {
+		if slices.Contains(model.AllUnitFileExtensions, filepath.Ext(path)) {
 			unitFilesPaths = append(unitFilesPaths, path)
 		}
 
