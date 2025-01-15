@@ -94,25 +94,148 @@ func TestCUnescapeOne(t *testing.T) {
 	}
 }
 
-func TestExtractFirstWordUnescapes(t *testing.T) {
+//nolint:funlen
+func TestExtractFirstWord(t *testing.T) {
 	t.Parallel()
 
-	input := `\a \b \f \n \r \t \v \\ \" \' \s \x50odman is \U0001F51F/\u0031\u0030 \110ello \127orld`
-	expected := []string{"\a", "\b", "\f", "\n", "\r", "\t", "\v", "\\", "\"", "'", " ",
-		"Podman", "is", "🔟/10", "Hello", "World"}
+	tests := []struct {
+		name          string
+		input         string
+		expected      []string
+		flags         SplitFlags
+		expectedError error
+		separators    string
+	}{
+		{
+			name: "SplitRelax", flags: SplitRelax,
+			input:    `"unbalanced quotes   \`,
+			expected: []string{"\"unbalanced", "quotes"},
+		},
+		{
+			name:          "No flags trailing backslash",
+			input:         `unbalanced quotes \`,
+			expectedError: errUnbalancedEscape,
+		},
+		{
+			name: "SplitCUnescape", flags: SplitCUnescape,
+			input: `\a \b \f \n \r \t \v \\ \" \' \s \x50odman is \U0001F51F/\u0031\u0030 \110ello \127orld`,
+			expected: []string{"\a", "\b", "\f", "\n", "\r", "\t", "\v", "\\", "\"", "'", " ", "Podman", "is", "🔟/10",
+				"Hello", "World"},
+		},
+		{
+			name: "SplitCUnescape don't keep trailing backslash", flags: SplitCUnescape,
+			input:         `\a \`,
+			expectedError: errUnbalancedEscape,
+		},
+		{
+			name: "SplitCUnescape unsupported escape sequence", flags: SplitCUnescape,
+			input:         `\k`,
+			expectedError: errUnsupportedEscapeChar,
+		},
+		{
+			name: "SplitUnescapeRelax", flags: SplitUnescapeRelax,
+			input:    `\k \z \`,
+			expected: []string{"k", "z", "\\"},
+		},
+		{
+			name: "SplitUnescapeSeparators | SplitCUnescape", flags: SplitUnescapeSeparators | SplitCUnescape,
+			input:    `hello\ world value other\tvalue`,
+			expected: []string{"hello world", "value", "other\tvalue"},
+		},
+		{
+			name:     `No flags "hello world" 'goodbye world'`,
+			input:    `"hello world" 'goodbye world'`,
+			expected: []string{`"hello`, `world"`, `'goodbye`, `world'`},
+		},
+		{
+			name: `SplitKeepQuote "hello world" "goodbye world"`, flags: SplitKeepQuote,
+			input:    `"hello world" 'goodbye world'`,
+			expected: []string{`"hello world"`, `'goodbye world'`},
+		},
+		{
+			name: "SplitKeepQuote unbalanced quotes", flags: SplitKeepQuote,
+			input:         `"unbalanced quotes`,
+			expectedError: errUnbalancedQuotes,
+		},
+		{
+			name: `SplitUnquote "hello world" "goodbye world"`, flags: SplitUnquote,
+			input:    `"hello world" 'goodbye world'`,
+			expected: []string{`hello world`, `goodbye world`},
+		},
+		{
+			name:  `No flags multiple adjacent separators`,
+			input: `hello:::world::goodbye::::world`, separators: ":",
+			expected: []string{"hello", "world", "goodbye", "world"},
+		},
+		{
+			name: `SplitDontCoalesceSeparators`, flags: SplitDontCoalesceSeparators,
+			input: `hello:::world::goodbye::::world`, separators: ":",
+			expected: []string{"hello", "", "", "world", "", "goodbye", "", "", "", "world"},
+		},
+		{
+			name: `SplitRetainEscape 'KEY=val "KEY2=val space" "KEY3=val with \"quotation\""'`, flags: SplitRetainEscape,
+			input:    `KEY=val "KEY2=val space" "KEY3=val with \"quotation\""`,
+			expected: []string{`KEY=val`, `"KEY2=val`, `space"`, `"KEY3=val`, `with`, `\"quotation\""`},
+		},
+		{
+			name: `SplitRetainEscape 'foo\xbar'`, flags: SplitRetainEscape,
+			input:    `foo\xbar`,
+			expected: []string{`foo\xbar`},
+		},
+		{
+			name: "SplitRetainSeparators", flags: SplitRetainSeparators,
+			input: `a:b`, separators: ":",
+			expected: []string{`a`, `b`},
+		},
+		{
+			name: "SplitRetainEscape", flags: SplitRetainSeparators | SplitRetainEscape,
+			input: `a\:b`, separators: ":",
+			expected: []string{`a\`, `b`},
+		},
+		{
+			name: `SplitDontCoalesceSeparators`, flags: SplitDontCoalesceSeparators,
+			input: `:foo\:bar:::waldo:`, separators: ":",
+			expected: []string{"", "foo:bar", "", "", "waldo"},
+		},
+	}
 
-	i := 0
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			separators := WhitespaceSeparators
+			if test.separators != "" {
+				separators = test.separators
+			}
+			output, err := runExtractFirstWord(test.input, separators, test.flags)
+			if err != nil {
+				require.ErrorIs(t, test.expectedError, err)
+			}
+
+			require.Lenf(t, output, len(test.expected), "Expected: %v, Got: %v", test.expected, output)
+			for i := range test.expected {
+				assert.Equal(t, test.expected[i], output[i])
+			}
+		})
+	}
+}
+
+func runExtractFirstWord(input, separators string, flags SplitFlags) ([]string, error) {
+	output := make([]string, 0)
 	next := input
 	for {
-		word, remaining, moreWords, err := extractFirstWord(next, " ", SplitCUnescape)
-		require.NoError(t, err)
+		word, remaining, moreWords, err := extractFirstWord(next, separators, flags)
+		if err != nil {
+			return nil, err
+		}
 
 		if !moreWords {
 			break
 		}
 
 		next = remaining
-		assert.Equal(t, expected[i], word)
-		i++
+		output = append(output, word)
 	}
+
+	return output, nil
 }
