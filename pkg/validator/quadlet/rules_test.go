@@ -56,7 +56,7 @@ func TestImageNotAmbiguous(t *testing.T) {
 		t.Run(test.image, func(t *testing.T) {
 			t.Parallel()
 
-			unit := testutils.ParseString(t, "[Container]\nImage=%s"+test.image)
+			unit := testutils.ParseString(t, "[Container]\nImage="+test.image)
 			errors := ImageNotAmbiguous(validator, unit, container.Image)
 			assert.Equal(t, len(errors) == 0, test.res)
 
