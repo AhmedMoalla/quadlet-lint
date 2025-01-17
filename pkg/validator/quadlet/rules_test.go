@@ -17,8 +17,10 @@ var validator = testutils.NewTestValidator(V.Options{})
 func TestNetworkFormat(t *testing.T) {
 	t.Parallel()
 
-	err := NetworkFormat.ParseAndValidate("value.container:opt1=val1")
+	res, err := NetworkFormat.ParseAndValidate("value.container:opt1=val1")
 	require.ErrorIs(t, err, rules.ErrInvalidOptions)
+	assert.Equal(t, "value.container", res.Value)
+	assert.Equal(t, "val1", res.Options["opt1"])
 }
 
 func TestImageNotAmbiguous(t *testing.T) {

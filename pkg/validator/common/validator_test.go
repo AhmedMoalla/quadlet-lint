@@ -6,6 +6,7 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const unitFileToTest = `[Container]
@@ -30,7 +31,7 @@ func TestCommonValidator_Validate(t *testing.T) {
 	unit := testutils.ParseString(t, unitFileToTest)
 
 	errs := validator.Validate(unit)
-	assert.Len(t, errs, 3)
+	require.Len(t, errs, 3)
 
 	expectedErrLines := []int{4, 7, 8}
 	for i, err := range errs {
