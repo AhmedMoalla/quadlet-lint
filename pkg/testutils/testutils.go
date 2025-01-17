@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
+	generated "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	P "github.com/AhmedMoalla/quadlet-lint/pkg/parser"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
@@ -38,7 +39,7 @@ func (t testValidator) Validate(_ M.UnitFile) []V.ValidationError {
 	return nil
 }
 
-func NewTestValidator(options V.Options, files ...string) V.Validator {
+func NewTestValidatorWithFields(options V.Options, fields M.FieldsMap, files ...string) V.Validator {
 	units := make([]M.UnitFile, 0, len(files))
 	for _, file := range files {
 		units = append(units, testUnitFile{filename: file})
@@ -46,7 +47,12 @@ func NewTestValidator(options V.Options, files ...string) V.Validator {
 	return testValidator{ctx: V.Context{
 		Options:      options,
 		AllUnitFiles: units,
+		AllFields:    fields,
 	}}
+}
+
+func NewTestValidator(options V.Options, files ...string) V.Validator {
+	return NewTestValidatorWithFields(options, generated.Fields, files...)
 }
 
 var IncludedTestUnits = generateFilePerExtension()

@@ -22,30 +22,34 @@ type Format struct {
 	ValueSeparator   string // ValueSeparator is the separator between the value and its options
 	OptionsSeparator string // OptionsSeparator is the separator between the options
 
+	ValidateOptions func(value string, options map[string]string) error
+}
+
+type FormatValidationResult struct {
 	Value string // Value is the value before the ValueSeparator. Populated after calling ParseAndValidate.
 	// Options are the options after the ValueSeparator split by the OptionsSeparator.
 	// Populated after calling ParseAndValidate.
 	Options map[string]string
-
-	ValidateOptions func(value string, options map[string]string) error
 }
 
-func (f *Format) ParseAndValidate(value string) error {
+func (f *Format) ParseAndValidate(value string) (FormatValidationResult, error) {
 	split := strings.Split(value, f.ValueSeparator)
 	if len(split) == 0 || len(split) > 2 {
-		return fmt.Errorf("%w: '%s' does not match the '%s' format because it is expected to have 2 parts after "+
+		return FormatValidationResult{}, fmt.Errorf("%w: '%s' does not match the '%s' format because it is expected to have 2 parts after "+
 			"splitting the value with '%s' but got instead %d parts", ErrInvalidPartLen, value, f.Name, f.ValueSeparator,
 			len(split))
 	}
 
-	f.Value = split[0]
+	result := FormatValidationResult{
+		Value: split[0],
+	}
 
 	if len(split) == 1 { // no options
-		return nil
+		return result, nil
 	}
 
 	if len(split[1]) == 0 { // empty options
-		return fmt.Errorf("%w: '%s' does not match the '%s' format because no options were found after "+
+		return result, fmt.Errorf("%w: '%s' does not match the '%s' format because no options were found after "+
 			"the value separator '%s'", ErrEmptyOpts, value, f.Name, f.ValueSeparator)
 	}
 
@@ -59,17 +63,18 @@ func (f *Format) ParseAndValidate(value string) error {
 		case len(kv) == 2: //nolint:mnd
 			options[kv[0]] = kv[1]
 		default:
-			return fmt.Errorf("%w: '%s' does not match the '%s' format because no remaining options were found after "+
+			return result, fmt.Errorf("%w: '%s' does not match the '%s' format because no remaining options were found after "+
 				"the options separator '%s'", ErrNoRemainingOpts, value, f.Name, f.OptionsSeparator)
 		}
 	}
-	f.Options = options
+
+	result.Options = options
 
 	if f.ValidateOptions != nil {
-		if err := f.ValidateOptions(f.Value, f.Options); err != nil {
-			return errors.Join(err, ErrInvalidOptions)
+		if err := f.ValidateOptions(result.Value, result.Options); err != nil {
+			return result, errors.Join(err, ErrInvalidOptions)
 		}
 	}
 
-	return nil
+	return result, nil
 }

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"maps"
 	"os"
 	"testing"
 
@@ -107,11 +108,13 @@ func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []Parsing
 	}
 	assert.Empty(t, errors)
 
-	generated.Fields = utils.MergeMaps(generated.Fields, additionalFields)
+	allFields := make(FieldsMap, len(generated.Fields))
+	maps.Copy(allFields, generated.Fields)
+	allFields = utils.MergeMaps(allFields, additionalFields)
 
 	for group, kv := range expectedGroups {
 		for key, expectedValues := range kv {
-			field := generated.Fields[group][key]
+			field := allFields[group][key]
 			result, ok := file.Lookup(field)
 			assert.True(t, ok, "expected key '%s' to have values '%s' but lookup was not successful",
 				key, expectedValues)

@@ -1,12 +1,13 @@
 package rules
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"testing"
 
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
-	model "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	generated "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/service"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/testutils"
@@ -16,11 +17,9 @@ import (
 
 var v = testutils.NewTestValidator(V.Options{})
 
-func TestCheckRules(t *testing.T) {
-	t.Parallel()
-
+func RunCheckRulesAndAssert(t *testing.T, validator V.Validator) {
 	unit := testutils.ParseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
-	rules := model.Groups{
+	rules := generated.Groups{
 		Container: container.GContainer{
 			Rootfs: Rules(RequiredIfNotPresent(container.Image)),
 		},
@@ -29,31 +28,40 @@ func TestCheckRules(t *testing.T) {
 		},
 	}
 
-	errs := CheckRules(v, unit, rules)
+	errs := CheckRules(validator, unit, rules)
 	assert.Len(t, errs, 2)
 
 	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
-		return err.ValidatorName == v.Name() &&
+		return err.ValidatorName == validator.Name() &&
 			err.ErrorCategory == V.RequiredKey &&
 			err.Line == 0 && err.Column == 0
 	}))
 
 	assert.True(t, slices.ContainsFunc(errs, func(err V.ValidationError) bool {
-		return err.ValidatorName == v.Name() &&
+		return err.ValidatorName == validator.Name() &&
 			err.ErrorCategory == V.InvalidValue &&
 			err.Line == 4 && err.Column == 9
 	}))
 }
 
+func TestCheckRules(t *testing.T) {
+	t.Parallel()
+
+	RunCheckRulesAndAssert(t, v)
+}
+
 func TestCheckRulesShouldPanicIfFieldNotGeneratedInModel(t *testing.T) {
 	t.Parallel()
 
-	field := model.Fields["Container"][container.Rootfs.Key]
-	delete(model.Fields["Container"], container.Rootfs.Key)
+	allFields := make(M.FieldsMap, len(generated.Fields))
+	maps.Copy(allFields, generated.Fields)
+
+	validator := testutils.NewTestValidatorWithFields(V.Options{}, allFields)
+
+	delete(allFields["Container"], container.Rootfs.Key)
 	assert.Panics(t, func() {
-		TestCheckRules(t)
+		RunCheckRulesAndAssert(t, validator)
 	})
-	model.Fields["Container"][container.Rootfs.Key] = field
 }
 
 func TestRequiredIfNotPresent(t *testing.T) {

@@ -31,6 +31,7 @@ func Rules(rules ...V.Rule) []V.Rule {
 func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.ValidationError {
 	validationErrors := make([]V.ValidationError, 0)
 
+	allFields := validator.Context().AllFields
 	groupsValue := reflect.ValueOf(rules)
 	groupsType := reflect.TypeOf(rules)
 
@@ -47,7 +48,7 @@ func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.Va
 
 			ruleFns, _ := groupValue.FieldByName(fieldName).Interface().([]V.Rule)
 			for _, rule := range ruleFns {
-				field, ok := model.Fields[groupName][fieldName]
+				field, ok := allFields[groupName][fieldName]
 				if !ok {
 					panic(fmt.Sprintf("field '%s.%s' not found in Fields map", groupName, fieldName))
 				}
@@ -134,7 +135,7 @@ func HaveFormat(format Format) V.Rule {
 
 		validationErrors := make([]V.ValidationError, 0)
 		for _, value := range res.Values() {
-			err := format.ParseAndValidate(value.Value)
+			_, err := format.ParseAndValidate(value.Value)
 			if err != nil {
 				validationErrors = append(validationErrors, *V.InvalidValue.ErrForField(validator.Name(), ErrBadFormat, field,
 					value.Line, value.Column, err.Error()))

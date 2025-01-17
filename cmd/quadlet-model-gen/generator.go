@@ -100,7 +100,7 @@ func groupsFile(b *bytes.Buffer, data sourceFileData) {
 	}
 	b.WriteString("}\n\n")
 
-	b.WriteString("var Fields =  map[string]map[string]M.Field{\n")
+	b.WriteString("var Fields =  M.FieldsMap{\n")
 	for group, fields := range fieldsByGroup {
 		b.WriteString(fmt.Sprintf("\t\"%s\": {\n", group))
 		for _, field := range fields {

@@ -24,25 +24,25 @@ func TestFormat_ParseAndValidate(t *testing.T) {
 		},
 	}
 
-	err := format.ParseAndValidate("test")
+	res, err := format.ParseAndValidate("test")
 	require.NoError(t, err)
-	assert.Equal(t, "test", format.Value)
-	assert.Empty(t, format.Options)
+	assert.Equal(t, "test", res.Value)
+	assert.Empty(t, res.Options)
 
-	err = format.ParseAndValidate("test@opt1=val1*opt2")
+	res, err = format.ParseAndValidate("test@opt1=val1*opt2")
 	require.NoError(t, err)
-	assert.Equal(t, "test", format.Value)
-	assert.Equal(t, map[string]string{"opt1": "val1", "opt2": "opt2"}, format.Options)
+	assert.Equal(t, "test", res.Value)
+	assert.Equal(t, map[string]string{"opt1": "val1", "opt2": "opt2"}, res.Options)
 
-	err = format.ParseAndValidate("bad@opt1*opt2")
+	_, err = format.ParseAndValidate("bad@opt1*opt2")
 	require.ErrorIs(t, err, ErrInvalidOptions)
 
-	err = format.ParseAndValidate("test@test@test")
+	_, err = format.ParseAndValidate("test@test@test")
 	require.ErrorIs(t, err, ErrInvalidPartLen)
 
-	err = format.ParseAndValidate("test@")
+	_, err = format.ParseAndValidate("test@")
 	require.ErrorIs(t, err, ErrEmptyOpts)
 
-	err = format.ParseAndValidate("test@opt1=val1*")
+	_, err = format.ParseAndValidate("test@opt1=val1*")
 	require.ErrorIs(t, err, ErrNoRemainingOpts)
 }

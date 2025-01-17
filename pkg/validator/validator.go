@@ -16,6 +16,7 @@ type Validator interface {
 
 type Context struct {
 	Options
+	AllFields    model.FieldsMap
 	AllUnitFiles []model.UnitFile
 }
 
