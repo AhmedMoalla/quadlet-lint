@@ -6,6 +6,8 @@ import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/lookup"
 )
 
+type FieldsMap map[string]map[string]Field
+
 type Field struct {
 	Group      string
 	Key        string

@@ -2,6 +2,7 @@ package quadlet
 
 import (
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
+	generated "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	V "github.com/AhmedMoalla/quadlet-lint/pkg/validator"
 )
 
@@ -11,8 +12,9 @@ var (
 	AmbiguousImageName = V.NewErrorCategory("ambiguous-image-name", V.LevelWarning)
 )
 
-func Validator(units []model.UnitFile, options V.Options) V.Validator {
+func ValidatorWithFields(fields model.FieldsMap, units []model.UnitFile, options V.Options) V.Validator {
 	context := V.Context{
+		AllFields:    fields,
 		AllUnitFiles: units,
 		Options:      options,
 	}
@@ -29,6 +31,10 @@ func Validator(units []model.UnitFile, options V.Options) V.Validator {
 			model.UnitTypePod:       noOpValidator{},
 		},
 	}
+}
+
+func Validator(units []model.UnitFile, options V.Options) V.Validator {
+	return ValidatorWithFields(generated.Fields, units, options)
 }
 
 type quadletValidator struct {
