@@ -15,7 +15,6 @@ import (
 const (
 	ErrValueNotAllowed     = "value-not-allowed"
 	ErrRequiredSuffix      = "required-suffix"
-	ErrKeyConflict         = "key-conflict"
 	ErrBadFormat           = "bad-format"
 	ErrNoMatchRegex        = "not-match-regex"
 	ErrZeroOrOneValue      = "zero-or-one-value"
@@ -50,7 +49,7 @@ func CheckRules(validator V.Validator, unit UnitFile, rules model.Groups) []V.Va
 			for _, rule := range ruleFns {
 				field, ok := model.Fields[groupName][fieldName]
 				if !ok {
-					panic(fmt.Sprintf("field %s not found in Fields map", fieldName))
+					panic(fmt.Sprintf("field '%s.%s' not found in Fields map", groupName, fieldName))
 				}
 				field.Group = groupField.Name
 				validationErrors = append(validationErrors, rule(validator, unit, field)...)
