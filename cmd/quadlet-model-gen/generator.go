@@ -16,15 +16,16 @@ const (
 )
 
 func generateSourceFiles(data sourceFileData) error {
-	workingDir, err := os.Getwd()
+	outputDir, err := getOutputDir()
 	if err != nil {
-		panic(err)
+		exit(err)
 	}
 
-	outputDir := filepath.Join(workingDir, generatedDirName)
 	err = os.Mkdir(outputDir, generatedFilesPerm)
 	if err != nil && !os.IsExist(err) {
 		return err
+	} else {
+		fmt.Printf("source files already generated in %s\n", outputDir)
 	}
 
 	err = generateFile(outputDir, data, "groups.go", groupsFile)
@@ -47,6 +48,15 @@ func generateSourceFiles(data sourceFileData) error {
 	}
 
 	return nil
+}
+
+func getOutputDir() (string, error) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(workingDir, generatedDirName), nil
 }
 
 type FileGenerator = func(*bytes.Buffer, sourceFileData)
