@@ -18,6 +18,8 @@ import (
 var v = testutils.NewTestValidator(V.Options{})
 
 func RunCheckRulesAndAssert(t *testing.T, validator V.Validator) {
+	t.Helper()
+
 	unit := testutils.ParseString(t, "[Container]\nOther=test\n[Service]\nKillMode=bad")
 	rules := generated.Groups{
 		Container: container.GContainer{

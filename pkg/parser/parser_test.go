@@ -5,13 +5,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	. "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 	generated "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/container"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model/generated/lookup"
 	"github.com/AhmedMoalla/quadlet-lint/pkg/utils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseUnitFileErrors(t *testing.T) {

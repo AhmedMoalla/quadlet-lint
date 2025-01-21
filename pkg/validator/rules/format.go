@@ -35,9 +35,10 @@ type FormatValidationResult struct {
 func (f *Format) ParseAndValidate(value string) (FormatValidationResult, error) {
 	split := strings.Split(value, f.ValueSeparator)
 	if len(split) == 0 || len(split) > 2 {
-		return FormatValidationResult{}, fmt.Errorf("%w: '%s' does not match the '%s' format because it is expected to have 2 parts after "+
-			"splitting the value with '%s' but got instead %d parts", ErrInvalidPartLen, value, f.Name, f.ValueSeparator,
-			len(split))
+		return FormatValidationResult{},
+			fmt.Errorf("%w: '%s' does not match the '%s' format because it is expected to have 2 parts after "+
+				"splitting the value with '%s' but got instead %d parts", ErrInvalidPartLen, value, f.Name,
+				f.ValueSeparator, len(split))
 	}
 
 	result := FormatValidationResult{
