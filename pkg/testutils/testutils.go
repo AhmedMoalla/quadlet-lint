@@ -52,7 +52,7 @@ func NewTestValidatorWithFields(options V.Options, fields M.FieldsMap, files ...
 }
 
 func NewTestValidator(options V.Options, files ...string) V.Validator {
-	return NewTestValidatorWithFields(options, generated.Fields, files...)
+	return NewTestValidatorWithFields(options, generated.Fields.Copy(), files...)
 }
 
 var IncludedTestUnits = generateFilePerExtension()

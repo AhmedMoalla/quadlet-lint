@@ -8,6 +8,18 @@ import (
 
 type FieldsMap map[string]map[string]Field
 
+func (m FieldsMap) Copy() FieldsMap {
+	mapCopy := make(FieldsMap, len(m))
+	for group, fields := range m {
+		mapCopy[group] = make(map[string]Field, len(fields))
+		for name, field := range fields {
+			mapCopy[group][name] = field
+		}
+	}
+
+	return mapCopy
+}
+
 type Field struct {
 	Group      string
 	Key        string

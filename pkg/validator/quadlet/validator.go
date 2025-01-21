@@ -34,7 +34,7 @@ func ValidatorWithFields(fields model.FieldsMap, units []model.UnitFile, options
 }
 
 func Validator(units []model.UnitFile, options V.Options) V.Validator {
-	return ValidatorWithFields(generated.Fields, units, options)
+	return ValidatorWithFields(generated.Fields.Copy(), units, options)
 }
 
 type quadletValidator struct {

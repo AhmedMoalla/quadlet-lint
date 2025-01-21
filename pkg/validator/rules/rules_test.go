@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"maps"
 	"regexp"
 	"slices"
 	"testing"
@@ -55,8 +54,7 @@ func TestCheckRules(t *testing.T) {
 func TestCheckRulesShouldPanicIfFieldNotGeneratedInModel(t *testing.T) {
 	t.Parallel()
 
-	allFields := make(M.FieldsMap, len(generated.Fields))
-	maps.Copy(allFields, generated.Fields)
+	allFields := generated.Fields.Copy()
 
 	validator := testutils.NewTestValidatorWithFields(V.Options{}, allFields)
 
