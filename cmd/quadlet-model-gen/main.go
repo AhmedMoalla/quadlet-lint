@@ -1,42 +1,78 @@
 package main
 
 import (
-	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const (
-	podmanVersionFlag   = "podman-version"
-	podmanVersionEnvKey = "PODMAN_VERSION"
+	podmanVersionFlag    = "podman-version"
+	podmanVersionEnvKey  = "PODMAN_VERSION"
+	fallbackFilesDirFlag = "fallback-dir"
 
-	podmanGithubTagsURL        = "https://raw.githubusercontent.com/containers/podman/refs/tags/%s"
-	quadletFileLocation        = podmanGithubTagsURL + "/pkg/systemd/quadlet/quadlet.go"
-	unitfileParserFileLocation = podmanGithubTagsURL + "/pkg/systemd/parser/unitfile.go"
-	baseModelPackageName       = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
+	baseModelPackageName = "github.com/AhmedMoalla/quadlet-lint/pkg/model/generated"
 )
 
 var (
 	podmanVersion = flag.String(podmanVersionFlag, "", "Podman's tag used to download the source file for code generation")
+	fallbackDir   = flag.String(fallbackFilesDirFlag, "", "Fallback files directory")
 )
 
 func main() {
+	outputDir, err := getOutputDir()
+	if err != nil {
+		exit(err)
+	}
+
+	entries, err := os.ReadDir(outputDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		exit(err)
+	}
+
+	if len(entries) != 0 {
+		return
+	}
+
 	flag.Parse()
 
 	podmanVersion := getPodmanVersion(*podmanVersion)
+	if podmanVersion == "" {
+		exit(fmt.Errorf("podman version was not provided. "+
+			"Use -%s flag or %s environment variable", podmanVersionFlag, podmanVersionEnvKey))
+	}
 
-	unitfileParserFile, err := downloadSourceFileFromGithub(unitfileParserFileLocation, podmanVersion)
+	var fallbackMap map[DownloadableFile]string
+	if *fallbackDir != "" {
+		absFallbackDir, err := filepath.Abs(*fallbackDir)
+		if err != nil {
+			exit(err)
+		}
+
+		fallbackMap = map[DownloadableFile]string{
+			Quadlet:  filepath.Join(absFallbackDir, podmanVersion, "quadlet.go"),
+			Unitfile: filepath.Join(absFallbackDir, podmanVersion, "unitfile.go"),
+		}
+	}
+
+	fmt.Printf("============== Quadlet Model Generation =============\n")
+	fmt.Printf("Output Dir: %s\n", outputDir)
+	fmt.Printf("Podman version: %s\n", podmanVersion)
+	fmt.Printf("Quadlet Fallback: %v\n", fallbackMap[Quadlet])
+	fmt.Printf("Unitfile Fallback: %v\n", fallbackMap[Unitfile])
+	fmt.Printf("=====================================================\n")
+
+	downloader := NewDownloader(podmanVersion, fallbackMap)
+
+	unitfileParserFile, err := downloader.Download(Unitfile)
 	if err != nil {
 		exit(fmt.Errorf("could not download unitfile.go source file: %w", err))
 	}
 	defer os.Remove(unitfileParserFile.Name())
 
-	quadletSourceFile, err := downloadSourceFileFromGithub(quadletFileLocation, podmanVersion)
+	quadletSourceFile, err := downloader.Download(Quadlet)
 	if err != nil {
 		exit(fmt.Errorf("could not download quadlet.go source file: %w", err))
 	}
@@ -80,43 +116,4 @@ func getPodmanVersion(version string) string {
 	}
 
 	return version
-}
-
-func downloadSourceFileFromGithub(location string, version string) (*os.File, error) {
-	if version == "" {
-		return nil, fmt.Errorf("podman version was not provided. "+
-			"Use -%s flag or %s environment variable", podmanVersionFlag, podmanVersionEnvKey)
-	}
-
-	url := fmt.Sprintf(location, version)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download from '%s': %w", url, err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status '%s' when downloading from '%s'", response.Status, url)
-	}
-
-	fileName := filepath.Base(location)
-	ext := filepath.Ext(fileName)
-	fileName = strings.TrimSuffix(fileName, ext)
-	file, err := os.CreateTemp("", fileName+"-*"+ext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary file to copy the content of quadlet file: %w", err)
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy file contents: %w", err)
-	}
-
-	return file, nil
 }

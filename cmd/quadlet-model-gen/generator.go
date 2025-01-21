@@ -16,12 +16,7 @@ const (
 )
 
 func generateSourceFiles(data sourceFileData) error {
-	workingDir, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	outputDir := filepath.Join(workingDir, generatedDirName)
+	outputDir, err := getOutputDir()
 	err = os.Mkdir(outputDir, generatedFilesPerm)
 	if err != nil && !os.IsExist(err) {
 		return err
@@ -47,6 +42,15 @@ func generateSourceFiles(data sourceFileData) error {
 	}
 
 	return nil
+}
+
+func getOutputDir() (string, error) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(workingDir, generatedDirName), nil
 }
 
 type FileGenerator = func(*bytes.Buffer, sourceFileData)
