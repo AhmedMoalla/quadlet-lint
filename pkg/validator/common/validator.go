@@ -17,7 +17,7 @@ func ValidatorWithFields(fields M.FieldsMap) V.Validator {
 }
 
 func Validator() V.Validator {
-	return ValidatorWithFields(generated.Fields)
+	return ValidatorWithFields(generated.Fields.Copy())
 }
 
 type commonValidator struct {

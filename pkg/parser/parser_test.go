@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"maps"
 	"os"
 	"testing"
 
@@ -109,9 +108,7 @@ func assertUnitFileParsedCorrectly(t *testing.T, file UnitFile, errors []Parsing
 	}
 	assert.Empty(t, errors)
 
-	allFields := make(FieldsMap, len(generated.Fields))
-	maps.Copy(allFields, generated.Fields)
-	allFields = utils.MergeMaps(allFields, additionalFields)
+	allFields := utils.MergeMaps(generated.Fields.Copy(), additionalFields)
 
 	for group, kv := range expectedGroups {
 		for key, expectedValues := range kv {
