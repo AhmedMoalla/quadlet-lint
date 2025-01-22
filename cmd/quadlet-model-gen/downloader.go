@@ -133,12 +133,11 @@ func copyFileToTemp(fileName string, src io.Reader) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file to copy the content of quadlet file: %w", err)
 	}
-	defer tempFile.Close()
 
 	_, err = io.Copy(tempFile, src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy file contents: %w", err)
 	}
-
+	tempFile.Seek(0, 0)
 	return tempFile, nil
 }

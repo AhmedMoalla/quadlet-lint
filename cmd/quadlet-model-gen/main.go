@@ -70,12 +70,14 @@ func main() {
 	if err != nil {
 		exit(fmt.Errorf("could not download unitfile.go source file: %w", err))
 	}
+	defer unitfileParserFile.Close()
 	defer os.Remove(unitfileParserFile.Name())
 
 	quadletSourceFile, err := downloader.Download(Quadlet)
 	if err != nil {
 		exit(fmt.Errorf("could not download quadlet.go source file: %w", err))
 	}
+	defer quadletSourceFile.Close()
 	defer os.Remove(quadletSourceFile.Name())
 
 	parseAndGenerateFiles(quadletSourceFile, unitfileParserFile)
