@@ -167,7 +167,7 @@ func extractVariable(spec ast.Spec) (string, any, error) {
 			"inspection does not support VARs value specs other then *ast.CompositeLit. Found %T", valueSpec.Values[0])
 	}
 
-	if _, ok := compositeSpec.Type.(*ast.MapType); ok {
+	if selector, ok := compositeSpec.Type.(*ast.SelectorExpr); ok && selector.Sel.Name == "FieldsMap" {
 		mapValue := computeMapField(compositeSpec)
 		if mapValue != nil {
 			return valueSpec.Names[0].Name, mapValue, nil
