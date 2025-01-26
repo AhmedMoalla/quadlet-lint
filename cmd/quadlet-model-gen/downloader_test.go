@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/md5"
+	"crypto/sha512"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +14,8 @@ import (
 )
 
 func TestFallbackDownloader_Download(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(returnTestData(t))
 	defer server.Close()
 
@@ -32,6 +34,8 @@ func TestFallbackDownloader_Download(t *testing.T) {
 }
 
 func TestFallbackDownloader_Fallback_Local(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(fail))
 	defer server.Close()
 
@@ -53,6 +57,8 @@ func TestFallbackDownloader_Fallback_Local(t *testing.T) {
 }
 
 func TestFallbackDownloader_Fallback_Download(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(fail))
 	defer server.Close()
 
@@ -77,6 +83,8 @@ func TestFallbackDownloader_Fallback_Download(t *testing.T) {
 }
 
 func TestFallbackDownloader_Fallback_Fail(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(fail))
 	defer server.Close()
 
@@ -89,11 +97,13 @@ func TestFallbackDownloader_Fallback_Fail(t *testing.T) {
 		name:     "quadlet.go",
 		location: server.URL + "/testdata/%s/quadlet.go",
 	})
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 	assert.Nil(t, downloaded)
 }
 
 func TestFallbackDownloader_Timeout(t *testing.T) {
+	t.Parallel()
+
 	server := httptest.NewServer(http.HandlerFunc(timeout))
 	defer server.Close()
 
@@ -115,18 +125,20 @@ func TestFallbackDownloader_Timeout(t *testing.T) {
 }
 
 func assertFileContentEqual(t *testing.T, file1 *os.File, file2 *os.File) {
+	t.Helper()
+
 	require.NotNil(t, file1)
-	checksum1, err := hashMD5(file1)
+	checksum1, err := hash(file1)
 	require.NoError(t, err)
 
 	require.NotNil(t, file2)
-	checksum2, err := hashMD5(file2)
+	checksum2, err := hash(file2)
 	require.NoError(t, err)
 	assert.Equal(t, checksum1, checksum2)
 }
 
-func hashMD5(file *os.File) ([]byte, error) {
-	hasher := md5.New()
+func hash(file *os.File) ([]byte, error) {
+	hasher := sha512.New()
 	_, err := io.Copy(hasher, file)
 	if err != nil {
 		return nil, err
@@ -144,16 +156,18 @@ func fail(w http.ResponseWriter, _ *http.Request) {
 }
 
 func returnTestData(t *testing.T) http.HandlerFunc {
+	t.Helper()
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		file, err := os.Open(req.URL.Path[1:])
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		written, err := io.Copy(w, file)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
 		stat, err := file.Stat()
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, stat.Size(), written)
 	}

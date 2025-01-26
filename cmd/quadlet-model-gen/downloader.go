@@ -138,6 +138,11 @@ func copyFileToTemp(fileName string, src io.Reader) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy file contents: %w", err)
 	}
-	tempFile.Seek(0, 0)
+
+	_, err = tempFile.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	return tempFile, nil
 }
