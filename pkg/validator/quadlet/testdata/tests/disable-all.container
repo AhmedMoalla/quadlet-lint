@@ -1,0 +1,12 @@
+#nolint:quadlet
+
+[Container]
+Network=:net::,
+Pod=test
+Group=group
+RemapUid=123
+RemapUsers=map
+
+[Service]
+KillMode=test
+Type=test

@@ -1,0 +1,16 @@
+#nolint:quadlet:deprecated-key,invalid-value.bad-format
+
+#nolint:quadlet:key-conflict,ambiguous-image-name
+[Container]
+Rootfs=test
+Image=ambiguous
+#nolint:quadlet:invalid-reference,invalid-value.not-match-regex
+Network=:net::,
+Pod=test
+Group=group
+RemapUid=123
+RemapUsers=map
+
+[Service]
+KillMode=test
+Type=test
