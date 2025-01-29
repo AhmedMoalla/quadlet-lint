@@ -10,11 +10,19 @@ import (
 	M "github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
 
+const NoLintDirectivePrefix = "#nolint:quadlet"
+
 type unitFileParser struct {
 	file *unitFile
 
-	currentGroup *unitGroup
-	lineNr       int
+	currentGroup     *unitGroup
+	currentKey       string
+	currentDirective *NoLintDirective
+	lineNr           int
+}
+
+type NoLintDirective struct {
+	Errors []string
 }
 
 type ParsingError struct {
@@ -48,7 +56,7 @@ func (e *ParsingError) Error() string {
 	return e.message
 }
 
-// Load a unit file from disk, remembering the path and filename
+// ParseUnitFile Loads a unit file from disk, remembering the path and filename
 func ParseUnitFile(pathName string) (M.UnitFile, []ParsingError) {
 	data, e := os.ReadFile(pathName)
 	if e != nil {
@@ -88,6 +96,18 @@ func parse(f *unitFile, data string) []ParsingError {
 		line, data = nextLine(data, 0)
 		p.lineNr++
 
+		if len(line) == 0 {
+			if p.currentDirective != nil { // File level exclusion
+				if len(p.currentDirective.Errors) == 0 {
+					f.disabledErrors.DisableAll = true
+				} else {
+					f.disabledErrors.Global = append(f.disabledErrors.Global, p.currentDirective.Errors...)
+				}
+				p.currentDirective = nil
+			}
+			continue
+		}
+
 		if lineIsComment(line) {
 			continue
 		}
@@ -119,6 +139,8 @@ func nextLine(data string, afterPos int) (string, string) {
 
 func (p *unitFileParser) parseLine(line string) *ParsingError {
 	switch {
+	case lineIsNoLintDirective(line):
+		return p.parseNoLintDirective(line)
 	case lineIsGroup(line):
 		return p.parseGroup(line)
 	case lineIsKeyValuePair(line):
@@ -127,6 +149,17 @@ func (p *unitFileParser) parseLine(line string) *ParsingError {
 		return newParsingErrorAtLine(p.lineNr, p.currentGroup.String(), line,
 			fmt.Sprintf("“%s” is not a key-value pair or group", line))
 	}
+}
+
+func (p *unitFileParser) parseNoLintDirective(line string) *ParsingError {
+	errors, ok := strings.CutPrefix(line, NoLintDirectivePrefix)
+	if !ok || len(errors) > 0 && errors[0] != ':' {
+		return newParsingError(p.lineNr, 0, "", "", "malformed nolint directive")
+	}
+
+	p.currentDirective = &NoLintDirective{Errors: strings.Split(errors, ",")}
+
+	return nil
 }
 
 func (p *unitFileParser) parseGroup(line string) *ParsingError {
@@ -196,7 +229,11 @@ func ensureGroup(f *unitFile, groupName string) *unitGroup {
 }
 
 func lineIsComment(line string) bool {
-	return len(line) == 0 || line[0] == '#' || line[0] == ';'
+	return !lineIsNoLintDirective(line) && line[0] == '#' || line[0] == ';'
+}
+
+func lineIsNoLintDirective(line string) bool {
+	return strings.HasPrefix(line, NoLintDirectivePrefix)
 }
 
 func lineIsGroup(line string) bool {

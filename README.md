@@ -59,3 +59,8 @@ Key=value
 #nolint:quadlet:err1 <- Disables 'err1' from being reported for the key
 Other=value
 ```
+#### Error format
+Errors specified in the directive should be specified in the following formats:
+- `validator.category.name`
+- `category.name`
+- `name`

@@ -8,8 +8,9 @@ import (
 )
 
 type unitFile struct {
-	groups      []*unitGroup
-	groupByName map[string]*unitGroup
+	groups         []*unitGroup
+	groupByName    map[string]*unitGroup
+	disabledErrors M.DisabledErrors
 
 	filename string
 	unitType M.UnitType
@@ -155,4 +156,8 @@ func (f unitFile) HasValue(field M.Field) bool {
 func (f unitFile) HasKey(field M.Field) bool {
 	_, ok := f.lookupLastRaw(field)
 	return ok
+}
+
+func (f unitFile) GetDisabledErrors() M.DisabledErrors {
+	return f.disabledErrors
 }

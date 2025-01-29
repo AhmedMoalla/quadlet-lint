@@ -11,13 +11,13 @@ var (
 	errOther = errors.New("other")
 
 	errLevel = []ValidationError{
-		{Error: errors.New("error1"), ErrorCategory: ErrorCategory{Level: LevelError}},
-		{Error: errors.New("error2"), ErrorCategory: ErrorCategory{Level: LevelError}},
-		{Error: errors.New("error3"), ErrorCategory: ErrorCategory{Level: LevelError}},
+		{Error: errors.New("error1"), Category: ErrorCategory{Level: LevelError}},
+		{Error: errors.New("error2"), Category: ErrorCategory{Level: LevelError}},
+		{Error: errors.New("error3"), Category: ErrorCategory{Level: LevelError}},
 	}
 	warnLevel = []ValidationError{
-		{Error: errors.New("warn1"), ErrorCategory: ErrorCategory{Level: LevelWarning}},
-		{Error: errors.New("warn2"), ErrorCategory: ErrorCategory{Level: LevelWarning}},
+		{Error: errors.New("warn1"), Category: ErrorCategory{Level: LevelWarning}},
+		{Error: errors.New("warn2"), Category: ErrorCategory{Level: LevelWarning}},
 	}
 )
 
@@ -44,8 +44,8 @@ func TestValidationErrors_HasErrors(t *testing.T) {
 
 	errs = make(ValidationErrors)
 	errs["test.go"] = append(errs["test.go"], ValidationError{
-		Error:         errOther,
-		ErrorCategory: ErrorCategory{Level: "Other"},
+		Error:    errOther,
+		Category: ErrorCategory{Level: "Other"},
 	})
 	assert.False(t, errs.HasErrors())
 }
@@ -58,7 +58,7 @@ func TestValidationErrors_AddError(t *testing.T) {
 
 	assert.Len(t, errs["test.go"], len(errLevel))
 
-	errs.AddError("test.go", ValidationError{Error: errOther, ErrorCategory: ErrorCategory{Level: "Other"}})
+	errs.AddError("test.go", ValidationError{Error: errOther, Category: ErrorCategory{Level: "Other"}})
 	assert.Len(t, errs["test.go"], len(errLevel)+1)
 }
 

@@ -65,9 +65,9 @@ func TestImageNotAmbiguous(t *testing.T) {
 			if len(errors) == 1 {
 				err := errors[0]
 				assert.Equal(t, validator.Name(), err.ValidatorName)
-				assert.Equal(t, AmbiguousImageName, err.ErrorCategory)
-				assert.Equal(t, 2, err.Line)
-				assert.Equal(t, 6, err.Column)
+				assert.Equal(t, AmbiguousImageName, err.Category)
+				assert.Equal(t, 2, err.Location.Line)
+				assert.Equal(t, 6, err.Location.Column)
 			} else if len(errors) > 1 {
 				require.FailNow(t, fmt.Sprintf("Unexpected errors: %v", errors))
 			}

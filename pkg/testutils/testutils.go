@@ -98,3 +98,7 @@ func (t testUnitFile) HasKey(field M.Field) bool {
 func (t testUnitFile) HasValue(field M.Field) bool {
 	panic("implement me")
 }
+
+func (t testUnitFile) GetDisabledErrors() M.DisabledErrors {
+	panic("implement me")
+}

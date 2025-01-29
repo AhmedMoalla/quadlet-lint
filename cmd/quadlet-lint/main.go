@@ -101,7 +101,7 @@ func validateUnitFiles(unitFiles []model.UnitFile, checkReferences bool) validat
 
 	for _, file := range unitFiles {
 		for _, vtor := range validators {
-			validationErrors.AddError(file.FileName(), vtor.Validate(file)...)
+			validationErrors.AddEnabledError(file.FileName(), file.GetDisabledErrors(), vtor.Validate(file)...)
 		}
 	}
 	return validationErrors
@@ -122,7 +122,8 @@ func reportErrors(errors validator.ValidationErrors) {
 					validatorName += "."
 				}
 				fmt.Printf("\t-> [%s][%s%s][%d:%d] %s\n",
-					err.Level, validatorName, err.ErrorCategory.Name, err.Line, err.Column, err.Error)
+					err.Category.Level, validatorName, err.Category.Name,
+					err.Location.Line, err.Location.Column, err.Error)
 			}
 		}
 	}

@@ -70,18 +70,18 @@ func (a Assertions) RunAssertions(t *testing.T, errors []V.ValidationError) {
 		t.Errorf("assertions failed for errors")
 		for _, err := range errors {
 			t.Errorf("\t- %v for Key: '%s.%s' at Line: %d, Column: %d\n => %s",
-				err, err.Group, err.Key, err.Line, err.Column, err.Error)
+				err, err.Group, err.Key, err.Location.Line, err.Location.Column, err.Error)
 		}
 	}
 }
 
 func matchesAssertion(assertion Assertion) func(err V.ValidationError) bool {
 	return func(err V.ValidationError) bool {
-		return (assertion.ErrName == "" || err.ErrorName == assertion.ErrName) &&
-			err.ErrorCategory.Name == assertion.ErrCategory &&
+		return (assertion.ErrName == "" || err.Name == assertion.ErrName) &&
+			err.Category.Name == assertion.ErrCategory &&
 			err.Group == assertion.Group &&
 			err.Key == assertion.Key &&
-			err.Line == assertion.Line &&
-			err.Column == assertion.Column
+			err.Location.Line == assertion.Line &&
+			err.Location.Column == assertion.Column
 	}
 }

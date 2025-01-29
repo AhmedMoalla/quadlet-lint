@@ -29,6 +29,19 @@ type UnitFile interface {
 	ListKeys(groupName string) []UnitKey
 	HasKey(field Field) bool
 	HasValue(field Field) bool
+	GetDisabledErrors() DisabledErrors
+}
+
+// DisabledErrors gives a list of disabled errors for a given group and key
+type DisabledErrors struct {
+	// DisableAll is true if error reporting is disabled
+	DisableAll bool
+	// Global contains the errors disabled in the whole file
+	Global []string
+	// Group => errors
+	Groups map[string][]string
+	// Group => Key => errors
+	Keys map[string]map[string][]string
 }
 
 type UnitType struct {

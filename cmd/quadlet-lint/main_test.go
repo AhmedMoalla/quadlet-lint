@@ -50,7 +50,7 @@ func TestValidateUnitFiles(t *testing.T) {
 	errs := validateUnitFiles(units, *checkReferences)
 	assert.Len(t, errs, 2)
 	assert.Len(t, errs["test.container"], 1)
-	assert.Equal(t, errs["test.container"][0].ErrorCategory, quadlet.AmbiguousImageName)
+	assert.Equal(t, errs["test.container"][0].Category, quadlet.AmbiguousImageName)
 }
 
 func TestReadInputPath(t *testing.T) {

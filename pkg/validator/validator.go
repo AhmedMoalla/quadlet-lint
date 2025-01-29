@@ -2,6 +2,8 @@ package validator
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/AhmedMoalla/quadlet-lint/pkg/model"
 )
@@ -35,20 +37,20 @@ var (
 )
 
 type ValidationError struct {
-	ErrorCategory
-	Location
+	Category      ErrorCategory
+	Location      Location
 	Error         error
 	ValidatorName string
 	Group         string
 	Key           string
-	ErrorName     string
+	Name          string
 }
 
 func (err ValidationError) String() string {
-	if err.ErrorName != "" {
-		return fmt.Sprintf("%s.%s.%s", err.ValidatorName, err.ErrorCategory.Name, err.ErrorName)
+	if err.Name != "" {
+		return fmt.Sprintf("%s.%s.%s", err.ValidatorName, err.Category.Name, err.Name)
 	}
-	return fmt.Sprintf("%s.%s", err.ValidatorName, err.ErrorCategory.Name)
+	return fmt.Sprintf("%s.%s", err.ValidatorName, err.Category.Name)
 }
 
 type ErrorCategory struct {
@@ -75,13 +77,13 @@ func (c ErrorCategory) ErrWithName(validatorName, errName, group, key string,
 	}
 
 	return &ValidationError{
-		ErrorCategory: c,
+		Category:      c,
 		Location:      Location{Line: line, Column: column},
 		Error:         err,
 		ValidatorName: validatorName,
 		Group:         group,
 		Key:           key,
-		ErrorName:     errName,
+		Name:          errName,
 	}
 }
 
@@ -117,7 +119,7 @@ func (errors ValidationErrors) WhereLevel(level Level) []ValidationError {
 
 	for _, errs := range errors {
 		for _, err := range errs {
-			if err.Level == level {
+			if err.Category.Level == level {
 				levelErrors = append(levelErrors, err)
 			}
 		}
@@ -135,6 +137,44 @@ func (errors ValidationErrors) AddError(filePath string, err ...ValidationError)
 		errors[filePath] = make([]ValidationError, 0, len(err))
 	}
 	errors[filePath] = append(errors[filePath], err...)
+}
+
+func (errors ValidationErrors) AddEnabledError(path string, disabledErrs model.DisabledErrors, err ...ValidationError) {
+	filtered := filterDisabled(disabledErrs, err...)
+	errors.AddError(path, filtered...)
+}
+
+func filterDisabled(disabledErrs model.DisabledErrors, errs ...ValidationError) []ValidationError {
+	filtered := make([]ValidationError, 0)
+	if disabledErrs.DisableAll {
+		return filtered
+	}
+
+	for _, err := range errs {
+		if containsError(disabledErrs.Global, err) {
+			continue
+		}
+
+		filtered = append(filtered, err)
+	}
+
+	return filtered
+}
+
+func containsError(errors []string, err ValidationError) bool {
+	return slices.ContainsFunc(errors, func(error string) bool {
+		parts := strings.Split(error, ".")
+		switch len(parts) {
+		case 1:
+			return err.Name == error
+		case 2:
+			return err.Category.Name == parts[0] && err.Name == parts[1]
+		case 3:
+			return err.ValidatorName == parts[0] && err.Category.Name == parts[1] && err.Name == parts[2]
+		default:
+			return false // Log a warning because of malformed error ?
+		}
+	})
 }
 
 func (errors ValidationErrors) Merge(other ValidationErrors) ValidationErrors {
